@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "stage:stormerhost": "node scripts/stage-stormerhost.mjs",
+    "test:stormerhost": "node scripts/smoke-stormerhost.mjs",
     "start": "next start",
     "lint": "eslint"
   },

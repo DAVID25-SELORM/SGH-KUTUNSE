@@ -53,7 +53,7 @@ test -s "$PAYLOAD_ROOT/.next/standalone/server.js"
 test -d "$PAYLOAD_ROOT/.next/standalone/node_modules"
 test -d "$PAYLOAD_ROOT/.next/standalone/.next/static"
 test -d "$PAYLOAD_ROOT/.next/standalone/public"
-grep -Fq 'import("./.next/standalone/server.js")' "$PAYLOAD_ROOT/app.js"
+grep -Fq 'require("./.next/standalone/server.js")' "$PAYLOAD_ROOT/app.js"
 
 # No --delete is used: tmp/, stderr.log, environment files, and any other
 # host-managed files already in the application root remain intact.
