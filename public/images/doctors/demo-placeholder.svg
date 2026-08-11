@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title description">
+  <title id="title">Demo doctor profile placeholder</title>
+  <desc id="description">A neutral placeholder used only for clearly labelled demonstration profiles.</desc>
+  <rect width="640" height="640" fill="#f4f0fa"/>
+  <circle cx="320" cy="235" r="105" fill="#ded2ee"/>
+  <path d="M125 590c18-135 95-215 195-215s177 80 195 215" fill="#ded2ee"/>
+  <text x="320" y="610" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#5d397c">DEMO PROFILE</text>
+</svg>
