@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "stage:stormerhost": "node scripts/stage-stormerhost.mjs",
     "start": "next start",
     "lint": "eslint"
   },

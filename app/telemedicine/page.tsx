@@ -15,7 +15,7 @@ export const metadata: Metadata = buildMetadata({
 });
 
 const steps = [
-  { icon: MessageSquare, title: "Request Consultation", description: "Submit a request for an online consultation." },
+  { icon: MessageSquare, title: "Call the Hospital", description: "Speak with our team to request an online consultation." },
   { icon: CalendarCheck, title: "Hospital Confirms Appointment", description: "A hospital representative confirms your appointment time." },
   { icon: Link2, title: "Receive Consultation Link", description: "You'll receive details to join your remote consultation." },
   { icon: Video, title: "Speak with a Healthcare Professional", description: "Connect remotely with a member of our clinical team." },
@@ -47,8 +47,8 @@ export default function TelemedicinePage() {
           </div>
 
           <div className="mt-12 flex justify-center">
-            <Button href="/appointments?service=Telemedicine" size="lg">
-              Request Online Consultation
+            <Button href={`tel:${HOSPITAL.phonesTel[0]}`} size="lg">
+              Call to Request a Consultation
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
