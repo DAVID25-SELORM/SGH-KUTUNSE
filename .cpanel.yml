@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - /bin/mkdir -p /home2/arkmedic/sgh-kutunse
+    - /usr/bin/rsync -a --exclude=.git --exclude=node_modules --exclude=.next --exclude=.npm-cache --exclude=.env --exclude=.env.local --exclude=.env.production --exclude='*.log' ./ /home2/arkmedic/sgh-kutunse/
+    - /bin/bash -lc 'source /home2/arkmedic/nodevenv/sgh-kutunse/22/bin/activate && cd /home2/arkmedic/sgh-kutunse && npm ci --include=dev --no-audit --no-fund'
+    - /bin/bash -lc 'source /home2/arkmedic/nodevenv/sgh-kutunse/22/bin/activate && cd /home2/arkmedic/sgh-kutunse && npm run lint'
+    - /bin/bash -lc 'source /home2/arkmedic/nodevenv/sgh-kutunse/22/bin/activate && cd /home2/arkmedic/sgh-kutunse && npm run build'
+    - /bin/bash -lc 'source /home2/arkmedic/nodevenv/sgh-kutunse/22/bin/activate && cd /home2/arkmedic/sgh-kutunse && npm run stage:stormerhost'
+    - /bin/mkdir -p /home2/arkmedic/sgh-kutunse/tmp && /usr/bin/touch /home2/arkmedic/sgh-kutunse/tmp/restart.txt

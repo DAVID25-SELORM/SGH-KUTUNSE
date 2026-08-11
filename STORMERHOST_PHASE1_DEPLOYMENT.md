@@ -34,6 +34,10 @@ Do not continue if the interface only supports static sites or if Node.js 22 is 
 
 Preferred method: deploy the reviewed Git commit into `~/sgh-kutunse` using cPanel Git Version Control or a private-repository deployment credential.
 
+For this cPanel account, Git Version Control clones the repository separately and uses the committed `.cpanel.yml` to deploy into `/home2/arkmedic/sgh-kutunse`. After updating the repository to the desired `main` commit, use **Deploy HEAD Commit**. The deployment tasks copy source without Git metadata or local build/dependency folders, activate the SGH Node 22 environment, run a clean dependency install, lint, build, stage the standalone runtime, and signal Passenger to restart this application.
+
+Review the cPanel deployment log after every deployment. A failed task must stop acceptance testing; do not assume later steps completed.
+
 Alternative: upload the prepared source archive and extract it into `~/sgh-kutunse`.
 
 The application root must not be `public_html` and must not be the Ark Medical Centre application directory. Do not copy this application into the Ark website.
