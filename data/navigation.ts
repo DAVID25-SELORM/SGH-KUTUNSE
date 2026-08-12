@@ -10,6 +10,7 @@ export const mainNav: NavItem[] = [
       { label: "All Medical Services", href: "/services" },
       { label: "General OPD", href: "/services/general-opd" },
       { label: "In-Patient Care", href: "/services/in-patient-services" },
+      { label: "Home Care Services", href: "/services/home-care" },
       { label: "Maternity & Gynaecology", href: "/services/maternity-gynaecology" },
       { label: "Paediatrics", href: "/services/paediatrics" },
       { label: "ENT", href: "/services/ent" },
