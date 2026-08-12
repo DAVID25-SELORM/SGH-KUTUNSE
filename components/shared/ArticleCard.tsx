@@ -8,9 +8,7 @@ export function ArticleCard({ article }: { article: Article }) {
   return (
     <Link href={`/health/${article.slug}`} className="group block h-full">
       <ElevatedCard className="flex h-full flex-col p-0 overflow-hidden">
-        <div className="relative aspect-[16/10] overflow-hidden bg-bg-soft">
-          <Image src={article.heroImage} alt="" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
-        </div>
+        {article.heroImage ? <div className="relative aspect-[16/10] overflow-hidden bg-bg-soft"><Image src={article.heroImage} alt="" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" /></div> : null}
         <div className="flex flex-1 flex-col p-6">
           <div className="flex items-center gap-2">
             <Badge>{article.category}</Badge>

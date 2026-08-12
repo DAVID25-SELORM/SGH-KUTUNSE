@@ -13,4 +13,3 @@ export const cmsDefinitions={
 } as const;
 export type CmsSection=keyof typeof cmsDefinitions;
 export function isCmsSection(value:string):value is CmsSection{return value in cmsDefinitions}
-

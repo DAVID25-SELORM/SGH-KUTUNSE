@@ -19,11 +19,10 @@ export interface Doctor {
   slug: string;
   fullName: string;
   specialty: string;
-  role: string;
+  role?: string;
   bio: string;
   availability: string;
-  photo: string;
-  isDemoData: boolean;
+  photo?: string;
 }
 
 export type DoctorSpecialty =
@@ -46,10 +45,9 @@ export interface Article {
   category: string;
   date: string;
   heroImage: string;
-  authorPlaceholder: string;
+  author: string;
   excerpt: string;
   content: string[];
-  isDemoContent: boolean;
 }
 
 export interface NavItem {
