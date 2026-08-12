@@ -5,6 +5,7 @@ export interface Service {
   category: string;
   icon: string;
   image?: string;
+  galleryImages?: { src: string; alt: string }[];
   imageAlt?: string;
   imagePosition?: string;
   featured?: boolean;

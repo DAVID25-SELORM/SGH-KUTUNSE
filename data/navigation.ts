@@ -26,6 +26,7 @@ export const mainNav: NavItem[] = [
   { label: "Doctors", href: "/doctors" },
   { label: "Insurance", href: "/insurance" },
   { label: "Patient Resources", href: "/patient-resources" },
+  { label: "Gallery", href: "/gallery" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -37,6 +38,7 @@ export const footerQuickLinks: NavItem[] = [
   { label: "Health Screening", href: "/screening" },
   { label: "Corporate Wellness", href: "/corporate-wellness" },
   { label: "Health Articles", href: "/health" },
+  { label: "Programs Gallery", href: "/gallery" },
   { label: "Careers", href: "/careers" },
   { label: "Directions", href: "/directions" },
 ];

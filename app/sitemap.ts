@@ -3,7 +3,7 @@ import { HOSPITAL } from "@/lib/constants";
 import { services } from "@/data/services";
 import { getPublishedArticles, getPublishedDoctors } from "@/lib/server/public-content";
 
-const staticRoutes = ["", "/about", "/services", "/doctors", "/appointments", "/insurance", "/telemedicine", "/screening", "/corporate-wellness", "/patient-resources", "/health", "/contact", "/directions", "/careers", "/privacy", "/terms"];
+const staticRoutes = ["", "/about", "/services", "/doctors", "/appointments", "/insurance", "/telemedicine", "/screening", "/corporate-wellness", "/patient-resources", "/health", "/gallery", "/contact", "/directions", "/careers", "/privacy", "/terms"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = HOSPITAL.siteUrl;

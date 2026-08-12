@@ -65,6 +65,13 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                 <figcaption className="mt-3 text-xs text-text-muted">Representative healthcare photography.</figcaption>
               </figure>
             ) : null}
+            {service.galleryImages?.map((image) => (
+              <figure key={image.src}>
+                <div className="relative aspect-[3/2] overflow-hidden rounded-3xl bg-bg-soft">
+                  <Image src={image.src} alt={image.alt} fill sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" unoptimized />
+                </div>
+              </figure>
+            ))}
             {service.covers && service.covers.length > 0 ? (
               <div>
                 <h2 className="text-xl font-semibold text-text-dark">What This Service Covers</h2>

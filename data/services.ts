@@ -54,8 +54,11 @@ export const services: Service[] = [
     shortDescription: "Hospital-coordinated care support for patients in their own homes.",
     category: "Primary & General Care",
     icon: "Home",
-    image: "/images/hospital/pharmacy-consultation.jpg",
-    imageAlt: "Pharmacy professional assisting a patient",
+    image: "/images/hospital/home-care-patient.jpg",
+    imageAlt: "Home care professional checking a patient's health",
+    galleryImages: [
+      { src: "/images/hospital/home-care-family.jpg", alt: "Healthcare professional supporting a patient and family at home" },
+    ],
     relatedServiceSlugs: ["general-opd", "telemedicine"],
   },
   {
