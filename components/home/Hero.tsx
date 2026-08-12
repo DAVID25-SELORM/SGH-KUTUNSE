@@ -8,10 +8,11 @@ export function Hero() {
   return (
     <section className="relative flex min-h-[calc(100svh-7.5rem)] items-center overflow-hidden bg-purple-dark text-white">
       <Image
-        src="/images/hospital/reception.png"
+        src="/images/hospital/reception.jpg"
         alt="Satellite General Hospital reception desk"
         fill
-        priority
+        preload
+        unoptimized
         sizes="100vw"
         className="object-cover object-center opacity-80"
       />

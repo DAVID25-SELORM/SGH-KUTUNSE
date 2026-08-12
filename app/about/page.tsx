@@ -50,9 +50,10 @@ export default function AboutPage() {
           <figure>
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-bg-soft">
               <Image
-                src="/images/hospital/patient-consultation.png"
+                src="/images/hospital/patient-consultation.jpg"
                 alt="Healthcare professional speaking with a patient"
                 fill
+                unoptimized
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />

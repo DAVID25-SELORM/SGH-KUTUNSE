@@ -14,6 +14,7 @@ export function ServiceCard({ service }: { service: Service }) {
             src={service.image}
             alt={service.imageAlt ?? ""}
             fill
+            unoptimized={service.image.startsWith("/images/hospital/")}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className={`object-cover transition-transform duration-500 group-hover:scale-[1.03] ${service.imagePosition ?? "object-center"}`}
           />

@@ -56,9 +56,10 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                     src={service.image}
                     alt={service.imageAlt ?? ""}
                     fill
+                    unoptimized={service.image.startsWith("/images/hospital/")}
                     sizes="(max-width: 1024px) 100vw, 66vw"
                     className={`object-cover ${service.imagePosition ?? "object-center"}`}
-                    priority
+                    preload
                   />
                 </div>
                 <figcaption className="mt-3 text-xs text-text-muted">Representative healthcare photography.</figcaption>
