@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /gallery/albums/{albumId}/{imageId} {
+      allow read: if true;
+      // Upload and deletion use server routes after explicit role checks.
+      allow write: if false;
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

@@ -3,7 +3,7 @@ import { FieldPath, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { submissionKinds, SUBMISSION_STATUSES, type SubmissionKind } from "@/lib/types/submissions";
 
-export type SerializedData = Record<string, unknown> & { reference?: unknown; fullName?: unknown; contactName?: unknown; companyName?: unknown; title?: unknown; name?: unknown; status?: unknown; slug?: unknown; createdAt?: unknown };
+export type SerializedData = Record<string, unknown> & { reference?: unknown; fullName?: unknown; contactName?: unknown; companyName?: unknown; title?: unknown; name?: unknown; status?: unknown; slug?: unknown; category?: unknown; createdAt?: unknown };
 export function serialize(data: FirebaseFirestore.DocumentData): SerializedData {
   return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value && typeof value.toDate === "function" ? value.toDate().toISOString() : value]));
 }

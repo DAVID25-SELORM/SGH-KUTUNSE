@@ -16,6 +16,7 @@ service cloud.firestore {
     match /doctors/{id} { allow read: if published(); allow write: if false; }
     match /services/{id} { allow read: if published(); allow write: if false; }
     match /articles/{id} { allow read: if published(); allow write: if false; }
+    match /gallery_albums/{id} { allow read: if published(); allow write: if false; }
     match /insurance_partners/{id} { allow read: if published(); allow write: if false; }
     match /website_settings/{id} { allow read: if resource.data.public == true; allow write: if false; }
     match /{document=**} { allow read, write: if false; }
