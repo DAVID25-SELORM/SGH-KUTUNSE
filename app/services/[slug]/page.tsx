@@ -56,7 +56,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                     src={service.image}
                     alt={service.imageAlt ?? ""}
                     fill
-                    unoptimized={service.image.startsWith("/images/hospital/")}
+                    unoptimized={service.image.startsWith("/images/hospital/") || service.image.startsWith("/images/telemedicine/")}
                     sizes="(max-width: 1024px) 100vw, 66vw"
                     className={`object-cover ${service.imagePosition ?? "object-center"}`}
                     preload

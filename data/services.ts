@@ -182,6 +182,8 @@ export const services: Service[] = [
     shortDescription: "Speak with a healthcare professional remotely.",
     category: "Digital & Community Care",
     icon: "Video",
+    image: "/images/telemedicine/video-consultation.jpg",
+    imageAlt: "Healthcare professional conducting an online consultation",
     featured: true,
     relatedServiceSlugs: ["general-opd", "home-care"],
   },
