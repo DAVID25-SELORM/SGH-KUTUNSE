@@ -1,0 +1,25 @@
+{
+  "indexes": [
+    {"collectionGroup":"appointment_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"appointment_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"appointment_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"appointment_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"assignedTo","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"contact_messages","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"contact_messages","queryScope":"COLLECTION","fields":[{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"contact_messages","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"corporate_enquiries","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"corporate_enquiries","queryScope":"COLLECTION","fields":[{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"corporate_enquiries","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"insurance_verifications","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"insurance_verifications","queryScope":"COLLECTION","fields":[{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"insurance_verifications","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"telemedicine_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"telemedicine_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"telemedicine_requests","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"searchTerms","arrayConfig":"CONTAINS"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"services","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
+    {"collectionGroup":"doctors","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"verified","order":"ASCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
+    {"collectionGroup":"insurance_partners","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"verified","order":"ASCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
+    {"collectionGroup":"articles","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}]}
+  ],
+  "fieldOverrides": []
+}

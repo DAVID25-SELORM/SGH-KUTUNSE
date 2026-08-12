@@ -18,7 +18,7 @@ export default function HealthArticlesPage() {
       <PageHero
         eyebrow="Health Articles"
         title="Health Tips & Hospital News"
-        description="Demo articles shown for layout purposes — replace with real, medically reviewed content before launch."
+        description="Hospital-approved health information and news will appear here after clinical and editorial review."
         crumbs={[{ label: "Health Articles" }]}
       />
 

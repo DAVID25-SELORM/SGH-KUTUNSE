@@ -8,12 +8,12 @@ export function Hero() {
   return (
     <section className="relative flex min-h-[calc(100svh-7.5rem)] items-center overflow-hidden bg-purple-dark text-white">
       <Image
-        src="/images/hero/hospital-care-team.png"
-        alt="Healthcare professionals featured in Satellite General Hospital's official material"
+        src="/images/hospital/reception.png"
+        alt="Satellite General Hospital reception desk"
         fill
         priority
         sizes="100vw"
-        className="object-cover object-[68%_20%] opacity-80 sm:object-center"
+        className="object-cover object-center opacity-80"
       />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(40,9,43,0.96)_0%,rgba(70,18,73,0.82)_42%,rgba(102,28,105,0.3)_72%,rgba(102,28,105,0.12)_100%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(39,8,41,0.72)_0%,transparent_38%)] sm:hidden" />

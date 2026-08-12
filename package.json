@@ -2,6 +2,9 @@
   "name": "satellite-general-hospital",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
   "engines": {
     "node": "22"
   },
@@ -11,22 +14,28 @@
     "stage:stormerhost": "node scripts/stage-stormerhost.mjs",
     "test:stormerhost": "node scripts/smoke-stormerhost.mjs",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run --exclude tests/firestore-rules.test.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run tests/firestore-rules.test.ts\"",
+    "emulators": "firebase emulators:start --only auth,firestore"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.17.1",
+    "firebase-admin": "^14.2.0",
     "framer-motion": "^13.0.0",
     "lucide-react": "^1.30.0",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.84.0",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -34,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.6"
   }
 }

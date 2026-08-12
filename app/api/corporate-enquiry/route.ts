@@ -1,7 +1,4 @@
-import { NextResponse } from "next/server";
-export async function POST() {
-  return NextResponse.json(
-    { ok: false, message: "Online corporate enquiries are temporarily unavailable. Please call the hospital." },
-    { status: 503 }
-  );
-}
+import { corporateEnquirySchema } from "@/lib/validation";
+import { submissionRoute } from "@/lib/server/public-route";
+export const runtime = "nodejs";
+export const POST = submissionRoute("corporate", corporateEnquirySchema);

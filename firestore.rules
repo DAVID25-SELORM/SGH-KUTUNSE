@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Sensitive operational data is accessible only through server routes using
+    // the Admin SDK. The Admin SDK still performs explicit role checks.
+    match /appointment_requests/{document=**} { allow read, write: if false; }
+    match /contact_messages/{document=**} { allow read, write: if false; }
+    match /corporate_enquiries/{document=**} { allow read, write: if false; }
+    match /insurance_verifications/{document=**} { allow read, write: if false; }
+    match /telemedicine_requests/{document=**} { allow read, write: if false; }
+    match /admin_users/{document=**} { allow read, write: if false; }
+    match /audit_logs/{document=**} { allow read, write: if false; }
+    match /submission_references/{document=**} { allow read, write: if false; }
+
+    function published() { return resource.data.status == 'published'; }
+    match /doctors/{id} { allow read: if published(); allow write: if false; }
+    match /services/{id} { allow read: if published(); allow write: if false; }
+    match /articles/{id} { allow read: if published(); allow write: if false; }
+    match /insurance_partners/{id} { allow read: if published(); allow write: if false; }
+    match /website_settings/{id} { allow read: if resource.data.public == true; allow write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

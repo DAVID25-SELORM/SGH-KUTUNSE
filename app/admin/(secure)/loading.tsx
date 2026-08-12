@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="rounded-2xl bg-white p-8 shadow-sm" role="status"><div className="h-6 w-48 animate-pulse rounded bg-bg-soft"/><div className="mt-6 h-48 animate-pulse rounded bg-bg-soft"/><span className="sr-only">Loading administration data</span></div>}

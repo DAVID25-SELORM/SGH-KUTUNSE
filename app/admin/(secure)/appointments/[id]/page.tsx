@@ -1,0 +1,1 @@
+import { SubmissionDetail } from "@/components/admin/SubmissionDetail"; export default async function Page({params}:{params:Promise<{id:string}>}){return <SubmissionDetail kind="appointments" id={(await params).id}/>}

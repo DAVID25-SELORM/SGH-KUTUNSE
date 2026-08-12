@@ -1,0 +1,1 @@
+import { SubmissionList } from "@/components/admin/SubmissionList";import type{InboxQuery}from"@/lib/server/admin-data";export default async function Page({searchParams}:{searchParams:Promise<InboxQuery>}){return <SubmissionList kind="corporate" filters={await searchParams}/>}

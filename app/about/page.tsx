@@ -50,15 +50,15 @@ export default function AboutPage() {
           <figure>
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-bg-soft">
               <Image
-                src="/images/patients/doctor-consultation.webp"
-                alt="Doctor speaking with a patient in a bright consultation room"
+                src="/images/hospital/patient-consultation.png"
+                alt="Healthcare professional speaking with a patient"
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
             </div>
             <figcaption className="mt-3 text-xs leading-relaxed text-text-muted">
-              Representative healthcare photography. Not an image of Satellite General Hospital staff or facilities.
+              Patient consultation at Satellite General Hospital.
             </figcaption>
           </figure>
         </Container>

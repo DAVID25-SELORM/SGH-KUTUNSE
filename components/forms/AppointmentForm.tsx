@@ -11,14 +11,16 @@ import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { appCheckHeaders } from "@/lib/app-check";
 
 export function AppointmentForm() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [reference, setReference] = useState("");
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<AppointmentInput>({ resolver: zodResolver(appointmentSchema) });
 
   async function onSubmit(data: AppointmentInput) {
@@ -26,10 +28,12 @@ export function AppointmentForm() {
     try {
       const res = await fetch("/api/appointments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await appCheckHeaders()) },
         body: JSON.stringify(data),
       });
+      const result = await res.json();
       if (!res.ok) throw new Error("Request failed");
+      setReference(result.reference);
       setStatus("success");
       reset();
     } catch {
@@ -40,7 +44,7 @@ export function AppointmentForm() {
   if (status === "success") {
     return (
       <Alert variant="success" title="Appointment request received.">
-        A hospital representative will contact you to confirm availability. If your need is urgent, please call
+        Your reference is <strong>{reference}</strong>. A hospital representative will contact you to confirm availability. If your need is urgent, please call
         the hospital directly.
       </Alert>
     );
@@ -48,9 +52,6 @@ export function AppointmentForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-      <Alert variant="warning" title="Online appointment requests are being upgraded.">
-        Please call Satellite General Hospital on 0303984314 or 059 257 5075 to request an appointment.
-      </Alert>
       {status === "error" ? (
         <Alert variant="warning" title="Something went wrong.">
           Please try again, or call the hospital directly to book your appointment.
@@ -170,8 +171,9 @@ export function AppointmentForm() {
         {...register("consent")}
       />
 
-      <Button type="submit" disabled className="w-full sm:w-fit">
-        Online requests temporarily unavailable
+      <input type="text" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" {...register("website")} />
+      <Button type="submit" disabled={isSubmitting} className="w-full sm:w-fit">
+        {isSubmitting ? "Submitting request…" : "Request Appointment"}
       </Button>
     </form>
   );

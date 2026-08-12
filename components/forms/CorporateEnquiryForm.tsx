@@ -7,14 +7,16 @@ import { corporateEnquirySchema, type CorporateEnquiryInput } from "@/lib/valida
 import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { appCheckHeaders } from "@/lib/app-check";
 
 export function CorporateEnquiryForm() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [reference, setReference] = useState("");
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<CorporateEnquiryInput>({ resolver: zodResolver(corporateEnquirySchema) });
 
   async function onSubmit(data: CorporateEnquiryInput) {
@@ -22,10 +24,10 @@ export function CorporateEnquiryForm() {
     try {
       const res = await fetch("/api/corporate-enquiry", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await appCheckHeaders()) },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Request failed");
+      const result = await res.json(); if (!res.ok) throw new Error("Request failed"); setReference(result.reference);
       setStatus("success");
       reset();
     } catch {
@@ -36,16 +38,13 @@ export function CorporateEnquiryForm() {
   if (status === "success") {
     return (
       <Alert variant="success" title="Enquiry received.">
-        Thank you — our team will contact you to discuss a corporate wellness proposal for your organisation.
+        Your reference is <strong>{reference}</strong>. Our team will contact you to discuss a corporate wellness proposal.
       </Alert>
     );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-      <Alert variant="warning" title="Online corporate enquiries are being upgraded.">
-        Please call Satellite General Hospital on 0303984314 or 059 257 5075.
-      </Alert>
       {status === "error" ? (
         <Alert variant="warning" title="Something went wrong.">
           Please try again, or call the hospital directly.
@@ -66,8 +65,9 @@ export function CorporateEnquiryForm() {
         placeholder="E.g. health screening, wellness programmes, health education"
         {...register("interests")}
       />
-      <Button type="submit" disabled className="w-full sm:w-fit">
-        Online enquiries temporarily unavailable
+      <input type="text" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" {...register("website")} />
+      <Button type="submit" disabled={isSubmitting} className="w-full sm:w-fit">
+        {isSubmitting ? "Submitting enquiry…" : "Request Corporate Wellness Proposal"}
       </Button>
     </form>
   );
