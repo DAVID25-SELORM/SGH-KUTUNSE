@@ -207,6 +207,7 @@ export function AdminShell({
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     aria-current={active ? "page" : undefined}
                     onClick={() => setOpen(false)}
                     className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? "bg-purple-deep text-white" : "text-text-body hover:bg-bg-soft hover:text-purple-deep"}`}
@@ -223,6 +224,7 @@ export function AdminShell({
       <div className="border-t border-border-default pt-4">
         <Link
           href="/"
+          prefetch={false}
           onClick={() => setOpen(false)}
           className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-text-body hover:bg-bg-soft"
         >
@@ -251,6 +253,7 @@ export function AdminShell({
         <div className="ml-auto flex items-center gap-3">
           <Link
             href="/"
+            prefetch={false}
             className="hidden rounded-xl border border-border-default px-3 py-2 text-sm font-semibold sm:block"
           >
             View website

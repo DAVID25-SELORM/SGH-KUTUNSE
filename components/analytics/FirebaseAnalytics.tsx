@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { firebaseApp } from "@/lib/firebase";
 
 export function FirebaseAnalytics() {
+  const pathname = usePathname();
   useEffect(() => {
+    if (pathname.startsWith("/admin")) return;
     let active = true;
 
     async function enableAnalytics() {
@@ -20,7 +23,7 @@ export function FirebaseAnalytics() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [pathname]);
 
   return null;
 }
