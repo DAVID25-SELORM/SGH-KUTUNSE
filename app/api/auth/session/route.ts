@@ -6,9 +6,28 @@ import { writeAudit } from "@/lib/server/audit";
 
 const expiresIn = 8 * 60 * 60 * 1000;
 
-export async function POST(request: Request) {
+const trustedOrigins = new Set([
+  "https://satellitegeneralhospital.com",
+  "https://www.satellitegeneralhospital.com",
+  "https://satellite-general-hospital--satelitegeneralhospital.us-east4.hosted.app",
+]);
+
+function isTrustedOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ ok: false }, { status: 403 });
+  if (!origin) return true;
+  if (trustedOrigins.has(origin)) return true;
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      return new URL(origin).hostname === "localhost";
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+export async function POST(request: Request) {
+  if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false, message: "Untrusted request origin." }, { status: 403 });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return NextResponse.json({ ok: false }, { status: 415 });
   try {
     const { idToken } = (await request.json()) as { idToken?: unknown };
