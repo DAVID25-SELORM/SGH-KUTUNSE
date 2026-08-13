@@ -149,6 +149,7 @@ export function AdminShell({
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!open) return;
     const old = document.body.style.overflow;
@@ -156,6 +157,23 @@ export function AdminShell({
     closeRef.current?.focus();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusable = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", key);
     return () => {
@@ -190,6 +208,7 @@ export function AdminShell({
                     key={item.href}
                     href={item.href}
                     aria-current={active ? "page" : undefined}
+                    onClick={() => setOpen(false)}
                     className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? "bg-purple-deep text-white" : "text-text-body hover:bg-bg-soft hover:text-purple-deep"}`}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />
@@ -204,6 +223,7 @@ export function AdminShell({
       <div className="border-t border-border-default pt-4">
         <Link
           href="/"
+          onClick={() => setOpen(false)}
           className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-text-body hover:bg-bg-soft"
         >
           <Home className="h-4 w-4" />
@@ -219,6 +239,8 @@ export function AdminShell({
           onClick={() => setOpen(true)}
           className="mr-3 grid h-11 w-11 place-items-center rounded-xl hover:bg-bg-soft lg:hidden"
           aria-label="Open admin navigation"
+          aria-expanded={open}
+          aria-controls="admin-mobile-navigation"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -254,10 +276,12 @@ export function AdminShell({
             onClick={() => setOpen(false)}
           />
           <aside
+            ref={drawerRef}
+            id="admin-mobile-navigation"
             role="dialog"
             aria-modal="true"
             aria-label="Admin navigation"
-            className="relative flex h-full w-[min(88vw,320px)] flex-col bg-white shadow-2xl"
+            className="fixed inset-y-0 left-0 flex w-[88vw] max-w-80 flex-col overflow-hidden border-r border-border-default bg-white shadow-2xl"
           >
             <div className="flex h-16 items-center justify-between border-b px-5">
               <strong className="text-purple-deep">SGH Admin</strong>
