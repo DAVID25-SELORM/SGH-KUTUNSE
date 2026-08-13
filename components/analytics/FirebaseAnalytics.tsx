@@ -9,14 +9,9 @@ export function FirebaseAnalytics() {
 
     async function enableAnalytics() {
       if (!firebaseApp) return;
-      const { initializeAnalytics, isSupported } = await import("firebase/analytics");
+      const { getAnalytics, isSupported } = await import("firebase/analytics");
       if (active && (await isSupported())) {
-        initializeAnalytics(firebaseApp, {
-          config: {
-            cookie_domain: window.location.hostname,
-            cookie_flags: "SameSite=Lax;Secure",
-          },
-        });
+        getAnalytics(firebaseApp);
       }
     }
 
