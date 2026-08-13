@@ -1,0 +1,281 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  BarChart3,
+  CalendarDays,
+  FileText,
+  GalleryHorizontal,
+  HeartHandshake,
+  Home,
+  Menu,
+  MessageSquare,
+  Newspaper,
+  Settings,
+  ShieldCheck,
+  Stethoscope,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  hasPermission,
+  type AdminRole,
+  type Permission,
+} from "@/lib/types/admin";
+import { LogoutButton } from "./LogoutButton";
+const groups: Array<{
+  label: string;
+  items: Array<{
+    href: string;
+    label: string;
+    icon: typeof Home;
+    permission?: Permission;
+  }>;
+}> = [
+  {
+    label: "Overview",
+    items: [{ href: "/admin", label: "Dashboard", icon: BarChart3 }],
+  },
+  {
+    label: "Requests",
+    items: [
+      {
+        href: "/admin/appointments",
+        label: "Appointments",
+        icon: CalendarDays,
+        permission: "appointments",
+      },
+      {
+        href: "/admin/contact",
+        label: "Contact",
+        icon: MessageSquare,
+        permission: "contact",
+      },
+      {
+        href: "/admin/insurance",
+        label: "Insurance",
+        icon: ShieldCheck,
+        permission: "insurance",
+      },
+      {
+        href: "/admin/corporate",
+        label: "Corporate",
+        icon: HeartHandshake,
+        permission: "corporate",
+      },
+      {
+        href: "/admin/telemedicine",
+        label: "Telemedicine",
+        icon: Stethoscope,
+        permission: "telemedicine",
+      },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      {
+        href: "/admin/content/doctors",
+        label: "Doctors",
+        icon: Users,
+        permission: "content",
+      },
+      {
+        href: "/admin/content/services",
+        label: "Services",
+        icon: Stethoscope,
+        permission: "content",
+      },
+      {
+        href: "/admin/content/articles",
+        label: "Health articles",
+        icon: Newspaper,
+        permission: "content",
+      },
+      {
+        href: "/admin/content/gallery",
+        label: "Gallery",
+        icon: GalleryHorizontal,
+        permission: "content",
+      },
+      {
+        href: "/admin/content/insurance-partners",
+        label: "Insurance partners",
+        icon: ShieldCheck,
+        permission: "content",
+      },
+      {
+        href: "/admin/content/site-settings",
+        label: "Site settings",
+        icon: Settings,
+        permission: "content",
+      },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      {
+        href: "/admin/users",
+        label: "Administrators",
+        icon: Users,
+        permission: "users",
+      },
+      {
+        href: "/admin/audit",
+        label: "Audit logs",
+        icon: FileText,
+        permission: "audit",
+      },
+    ],
+  },
+];
+const roleName = (role: AdminRole) =>
+  role
+    .split("_")
+    .map((x) => x[0].toUpperCase() + x.slice(1))
+    .join(" ");
+export function AdminShell({
+  children,
+  email,
+  role,
+}: {
+  children: React.ReactNode;
+  email: string;
+  role: AdminRole;
+}) {
+  const path = usePathname();
+  const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const old = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => {
+      document.body.style.overflow = old;
+      window.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  const nav = (
+    <nav
+      aria-label="Admin navigation"
+      className="flex-1 overflow-y-auto px-3 py-5"
+    >
+      {groups.map((group) => {
+        const items = group.items.filter(
+          (item) => !item.permission || hasPermission(role, item.permission),
+        );
+        if (!items.length) return null;
+        return (
+          <div key={group.label} className="mb-6">
+            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[.14em] text-text-muted">
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {items.map((item) => {
+                const active =
+                  item.href === "/admin"
+                    ? path === item.href
+                    : path.startsWith(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? "bg-purple-deep text-white" : "text-text-body hover:bg-bg-soft hover:text-purple-deep"}`}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <div className="border-t border-border-default pt-4">
+        <Link
+          href="/"
+          className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-text-body hover:bg-bg-soft"
+        >
+          <Home className="h-4 w-4" />
+          View website
+        </Link>
+      </div>
+    </nav>
+  );
+  return (
+    <div className="min-h-screen bg-neutral-light">
+      <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border-default bg-white px-4 lg:pl-[276px]">
+        <button
+          onClick={() => setOpen(true)}
+          className="mr-3 grid h-11 w-11 place-items-center rounded-xl hover:bg-bg-soft lg:hidden"
+          aria-label="Open admin navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div>
+          <p className="font-bold text-purple-deep">SGH Administration</p>
+          <p className="text-xs text-text-muted">Secure hospital operations</p>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            href="/"
+            className="hidden rounded-xl border border-border-default px-3 py-2 text-sm font-semibold sm:block"
+          >
+            View website
+          </Link>
+          <div className="hidden max-w-56 text-right md:block">
+            <p className="truncate text-sm font-semibold">{email}</p>
+            <p className="text-xs text-text-muted">{roleName(role)}</p>
+          </div>
+          <LogoutButton />
+        </div>
+      </header>
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border-default bg-white lg:flex">
+        <div className="flex h-16 items-center border-b border-border-default px-6">
+          <strong className="text-lg text-purple-deep">SGH Admin</strong>
+        </div>
+        {nav}
+      </aside>
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-text-dark/50"
+            aria-label="Close admin navigation"
+            onClick={() => setOpen(false)}
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Admin navigation"
+            className="relative flex h-full w-[min(88vw,320px)] flex-col bg-white shadow-2xl"
+          >
+            <div className="flex h-16 items-center justify-between border-b px-5">
+              <strong className="text-purple-deep">SGH Admin</strong>
+              <button
+                ref={closeRef}
+                onClick={() => setOpen(false)}
+                aria-label="Close admin navigation"
+                className="grid h-11 w-11 place-items-center rounded-xl"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {nav}
+          </aside>
+        </div>
+      )}
+      <main id="main-content" className="min-w-0 p-4 sm:p-6 lg:ml-64 lg:p-8">
+        {children}
+      </main>
+    </div>
+  );
+}

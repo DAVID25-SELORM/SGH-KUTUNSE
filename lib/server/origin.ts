@@ -1,0 +1,2 @@
+const trustedOrigins=new Set(["https://satellitegeneralhospital.com","https://www.satellitegeneralhospital.com","https://satellite-general-hospital--satelitegeneralhospital.us-east4.hosted.app"]);
+export function isTrustedOrigin(request:Request){const origin=request.headers.get("origin");if(!origin||trustedOrigins.has(origin))return true;if(process.env.NODE_ENV!=="production"){try{return new URL(origin).hostname==="localhost"}catch{return false}}return false}

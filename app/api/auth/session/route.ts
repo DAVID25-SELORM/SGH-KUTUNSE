@@ -3,28 +3,9 @@ import { adminAuth } from "@/lib/server/firebase-admin";
 import { ADMIN_ROLES } from "@/lib/types/admin";
 import { SESSION_COOKIE } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 const expiresIn = 8 * 60 * 60 * 1000;
-
-const trustedOrigins = new Set([
-  "https://satellitegeneralhospital.com",
-  "https://www.satellitegeneralhospital.com",
-  "https://satellite-general-hospital--satelitegeneralhospital.us-east4.hosted.app",
-]);
-
-function isTrustedOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  if (trustedOrigins.has(origin)) return true;
-  if (process.env.NODE_ENV !== "production") {
-    try {
-      return new URL(origin).hostname === "localhost";
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
 
 export async function POST(request: Request) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false, message: "Untrusted request origin." }, { status: 403 });

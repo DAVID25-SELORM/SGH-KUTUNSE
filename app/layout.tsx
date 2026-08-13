@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { UtilityBar } from "@/components/layout/UtilityBar";
-import { MobileActionBar } from "@/components/layout/MobileActionBar";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 import { StructuredData } from "@/components/layout/StructuredData";
 import { FirebaseAnalytics } from "@/components/analytics/FirebaseAnalytics";
 import { HOSPITAL } from "@/lib/constants";
@@ -51,13 +48,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <UtilityBar />
-        <Header />
+        <SiteChrome position="before" />
         <main id="main-content" className="flex-1">
           {children}
         </main>
-        <Footer />
-        <MobileActionBar />
+        <SiteChrome position="after" />
       </body>
     </html>
   );

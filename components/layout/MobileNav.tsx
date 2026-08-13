@@ -109,6 +109,7 @@ export function MobileNav({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
               </li>
             ))}
           </ul>
+          <Link href="/patient-portal" onClick={onClose} className="mt-2 flex min-h-12 items-center rounded-xl bg-bg-soft px-3 py-3 text-base font-semibold text-purple-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-deep">Patient Portal</Link>
         </nav>
 
         <div className="grid shrink-0 gap-3 border-t border-border-default bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:grid-cols-2">
