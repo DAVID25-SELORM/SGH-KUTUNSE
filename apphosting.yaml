@@ -1,0 +1,44 @@
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAndsRdfXpkPMPSq-z5Lv85ag-TzUHzTZU
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: satelitegeneralhospital.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: satelitegeneralhospital
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: satelitegeneralhospital.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "113012860503"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:113012860503:web:a224d2f8d5df66be21e512
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-W7VSGW3K7Z
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: REQUIRE_FIREBASE_APP_CHECK
+    value: "false"
+    availability:
+      - RUNTIME
+  - variable: FOLLOW_UP_HOURS
+    value: "48"
+    availability:
+      - RUNTIME
