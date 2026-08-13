@@ -234,10 +234,10 @@ export function AdminShell({
   );
   return (
     <div className="min-h-screen bg-neutral-light">
-      <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border-default bg-white px-4 lg:pl-[276px]">
+      <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border-default bg-white px-4 min-[900px]:pl-[276px]">
         <button
           onClick={() => setOpen(true)}
-          className="mr-3 grid h-11 w-11 place-items-center rounded-xl hover:bg-bg-soft lg:hidden"
+          className="mr-3 grid h-11 w-11 place-items-center rounded-xl hover:bg-bg-soft min-[900px]:hidden"
           aria-label="Open admin navigation"
           aria-expanded={open}
           aria-controls="admin-mobile-navigation"
@@ -262,14 +262,14 @@ export function AdminShell({
           <LogoutButton />
         </div>
       </header>
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border-default bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border-default bg-white min-[900px]:flex">
         <div className="flex h-16 items-center border-b border-border-default px-6">
           <strong className="text-lg text-purple-deep">SGH Admin</strong>
         </div>
         {nav}
       </aside>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 min-[900px]:hidden">
           <button
             className="absolute inset-0 bg-text-dark/50"
             aria-label="Close admin navigation"
@@ -298,7 +298,7 @@ export function AdminShell({
           </aside>
         </div>
       )}
-      <main id="main-content" className="min-w-0 p-4 sm:p-6 lg:ml-64 lg:p-8">
+      <main id="main-content" className="min-w-0 p-4 sm:p-6 min-[900px]:ml-64 min-[900px]:p-8">
         {children}
       </main>
     </div>
