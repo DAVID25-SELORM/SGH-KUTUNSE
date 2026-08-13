@@ -70,6 +70,7 @@ const groups: Array<{
         icon: Stethoscope,
         permission: "telemedicine",
       },
+      { href: "/admin/feedback", label: "Patient feedback", icon: MessageSquare, permission: "feedback" },
     ],
   },
   {

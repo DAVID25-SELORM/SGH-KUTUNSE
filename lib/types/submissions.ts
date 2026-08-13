@@ -11,5 +11,6 @@ export const submissionKinds = {
   corporate: { collection: "corporate_enquiries", prefix: "COR", permission: "corporate", label: "Corporate Enquiries" },
   insurance: { collection: "insurance_verifications", prefix: "INS", permission: "insurance", label: "Insurance Requests" },
   telemedicine: { collection: "telemedicine_requests", prefix: "TEL", permission: "telemedicine", label: "Telemedicine Requests" },
+  feedback: { collection: "feedback_responses", prefix: "FBK", permission: "feedback_manage", label: "Patient Feedback" },
 } as const;
 export type SubmissionKind = keyof typeof submissionKinds;

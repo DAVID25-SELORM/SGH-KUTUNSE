@@ -1,16 +1,16 @@
 export const ADMIN_ROLES = ["super_admin", "admin", "reception", "insurance", "corporate", "content_editor", "viewer"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type Permission = "appointments" | "contact" | "insurance" | "corporate" | "telemedicine" | "content" | "users" | "audit";
+export type Permission = "appointments" | "contact" | "insurance" | "corporate" | "telemedicine" | "content" | "users" | "audit" | "feedback" | "feedback_manage" | "feedback_receipts" | "feedback_campaigns" | "feedback_sms";
 
 const grants: Record<AdminRole, readonly Permission[]> = {
-  super_admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "users", "audit"],
-  admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "audit"],
-  reception: ["appointments", "contact", "telemedicine"],
+  super_admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "users", "audit", "feedback", "feedback_manage", "feedback_receipts", "feedback_campaigns", "feedback_sms"],
+  admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "audit", "feedback", "feedback_manage", "feedback_campaigns"],
+  reception: ["appointments", "contact", "telemedicine", "feedback", "feedback_manage"],
   insurance: ["insurance"],
   corporate: ["corporate"],
   content_editor: ["content"],
-  viewer: ["appointments", "contact", "insurance", "corporate", "telemedicine"],
+  viewer: ["appointments", "contact", "insurance", "corporate", "telemedicine", "feedback"],
 };
 
 export function hasPermission(role: AdminRole, permission: Permission) {
@@ -20,4 +20,3 @@ export function hasPermission(role: AdminRole, permission: Permission) {
 export function canMutate(role: AdminRole) {
   return role !== "viewer";
 }
-

@@ -22,4 +22,5 @@ describe("public CMS publication rules", () => {
   it("denies unpublished CMS content", async () => assertFails(getDoc(doc(env!.unauthenticatedContext().firestore(),"articles","draft"))));
   it("allows explicitly published CMS content", async () => assertSucceeds(getDoc(doc(env!.unauthenticatedContext().firestore(),"articles","published"))));
   it("denies every client CMS write", async () => assertFails(setDoc(doc(env!.authenticatedContext("editor",{role:"content_editor"}).firestore(),"articles","published"),{status:"draft"})));
+  it("denies direct public feedback access",async()=>{await assertFails(getDoc(doc(env!.unauthenticatedContext().firestore(),"feedback_responses","x")));await assertFails(setDoc(doc(env!.unauthenticatedContext().firestore(),"feedback_responses","x"),{status:"new"}))});
 });

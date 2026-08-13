@@ -22,7 +22,11 @@
     {"collectionGroup":"articles","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}]},
     {"collectionGroup":"gallery_albums","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
     {"collectionGroup":"gallery_albums","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"category","order":"ASCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
-    {"collectionGroup":"gallery_albums","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"featured","order":"DESCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]}
+    {"collectionGroup":"gallery_albums","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"featured","order":"DESCENDING"},{"fieldPath":"displayOrder","order":"ASCENDING"}]},
+    {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"visitType","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"needsReview","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"feedback_campaigns","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
   ],
   "fieldOverrides": []
 }

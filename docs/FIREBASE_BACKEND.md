@@ -10,6 +10,20 @@ CMS rollout is additive: seed static data idempotently with stable slugs, never 
 
 Manual setup: enable Email/Password Authentication; create the first approved staff user; set its `role=super_admin` custom claim using a one-time controlled Admin SDK process; deploy rules/indexes only after review; grant the App Hosting runtime service account least-privilege Firebase Auth Admin and Firestore access; register and enforce App Check after testing; configure authorized domains; create approved Storage buckets/rules before enabling CMS uploads. No email/SMS/WhatsApp notification provider is configured.
 
+## Patient feedback architecture (local implementation; not deployed)
+
+`/feedback` is a no-login, anonymous-by-default survey. The browser posts strict JSON to `/api/feedback`; the route enforces payload bounds, content type, honeypot and optional App Check, then the Admin SDK creates `feedback_responses/{id}`, a non-sensitive `submission_references` reservation, and a minimal history entry. Direct client Firestore access remains denied. Optional contact details are stored only when follow-up is requested. Receipt/payment concerns are neutral allegations, flagged `receiptRestricted`, excluded from ordinary dashboard cards, and visible only with `feedback_receipts`; access is audited without allegation content.
+
+Admin pages are `/admin/feedback`, `/admin/feedback/[id]`, and `/admin/feedback/campaigns`. Permissions are additive: `feedback`, `feedback_manage`, `feedback_receipts`, `feedback_campaigns`, and `feedback_sms`. Super administrators receive all; administrators do not receive receipt-detail or live-SMS permission; reception can manage ordinary feedback; viewers are read-only. Server authorization remains authoritative.
+
+Campaign concepts use `feedback_campaigns` and future recipient subcollections. URLs may include only an opaque campaign code/source—never names, phone numbers, patient/member IDs or medical identifiers. Unique recipient tokens are not implemented, preserving non-correlatable anonymous responses. QR codes should point to `/feedback` or a non-identifying campaign/source URL after wording approval.
+
+`SmsProvider` is server-only; `MockSmsProvider` is the only implementation. Real sending is disabled. A production Ghana-compatible adapter must provide server secrets, approved sender ID, API endpoint, acceptance/delivery semantics, webhook signature verification, idempotency keys, opt-out handling and retention rules. Suggested secret variables: `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID`, and `SMS_WEBHOOK_SECRET`; never prefix them with `NEXT_PUBLIC_`.
+
+Before deployment: approve survey/privacy/SMS wording; select roles allowed to view ordinary and receipt feedback; approve follow-up SLA, retention/TTL, escalation and opt-out rules; configure and enforce App Check/Cloud Armor; select provider; implement signed delivery webhook and idempotent recipient batches; review rules/indexes; deploy to preview; run anonymous, role, mobile and accessibility QA. Rollback is code rollback plus disabling the feedback navigation/provider; do not delete responses without an approved retention procedure. The existing Google Form remains untouched.
+
+The campaign admin includes downloadable PNG QR generation for reception, OPD, screening, laboratory and pharmacy. QR URLs contain only `source=qr` and a non-identifying campaign label. Before live campaign controls are unlocked, recipient documents must store normalized phone numbers, consent/opt-out state, an idempotency key, queued/attempted/provider-accepted/handset-delivered/failed/skipped state, and timestamps. “Delivered” must only be used when the provider confirms handset delivery. Recipient collections remain Admin-SDK-only and audit metadata must not contain plaintext phone numbers.
+
 ## App Check console steps
 
 1. In Google Cloud Console, enable reCAPTCHA Enterprise and create a website key for the approved production and App Hosting preview domains.
