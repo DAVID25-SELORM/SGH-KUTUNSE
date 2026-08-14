@@ -7,7 +7,8 @@ import { writeAudit } from "@/lib/server/audit";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
 import { ensureApprovedStaffContacts, ensureLegacyCampaignContacts } from "@/lib/server/feedback-contacts";
-import { contactMatchesAudience, type AudienceFilters } from "@/lib/contacts";
+import type { AudienceFilters } from "@/lib/contacts";
+import { loadCampaignAudience } from "@/lib/server/campaign-audience";
 
 const CHUNK_SIZE = 400;
 
@@ -40,47 +41,28 @@ export async function POST(
   if (!["draft", "ready"].includes(String(target.data()?.status)))
     return NextResponse.json({ ok: false, message: "Recipients cannot be changed after processing starts." }, { status: 409 });
 
-  const contactSnapshot = targetSource === "all_contacts"
-    ? await adminDb.collection("feedback_contacts").limit(5_001).get()
-    : await adminDb.collection("feedback_contacts").where("source", "==", targetSource).limit(5_001).get();
-  const uniquePhones = new Map<string, string>();
-  let invalid = 0;
-  for (const document of contactSnapshot.docs) {
-    if (!contactMatchesAudience(document.data(), audience)) continue;
-    const phone = normalizeGhanaPhone(String(document.data().phone ?? ""));
-    if (!phone) { invalid++; continue; }
-    uniquePhones.set(recipientKey(phone), phone);
-  }
-  if (uniquePhones.size > 5_000)
-    return NextResponse.json({ ok: false, message: "This audience exceeds the 5,000-recipient campaign limit. Apply narrower filters." }, { status: 413 });
-  if (!uniquePhones.size)
-    return NextResponse.json({ ok: false, message: "No eligible source contacts were found." }, { status: 409 });
-
-  const candidates = [...uniquePhones].map(([hash, phone]) => ({ hash, phone }));
+  let resolved;
+  try { resolved = await loadCampaignAudience(audience); }
+  catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This audience exceeds the 5,000-recipient campaign limit. Apply narrower filters." }, { status: 413 }); throw error; }
+  const { summary, eligibleContacts } = resolved;
+  if (!summary.eligible) return NextResponse.json({ ok: false, message: "No contacts are currently eligible for SMS.", audience: summary }, { status: 409 });
+  const candidates = eligibleContacts.map(contact => { const phone = normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? ""))!; return { hash: recipientKey(phone), phone }; });
   const existing = new Set<string>();
-  const optedOut = new Set<string>();
   for (const group of chunks(candidates)) {
-    const [targetDocs, optOutDocs] = await Promise.all([
-      adminDb.getAll(...group.map(({ hash }) => targetRef.collection("recipients").doc(hash))),
-      adminDb.getAll(...group.map(({ hash }) => adminDb.collection("sms_opt_outs").doc(hash))),
-    ]);
+    const targetDocs = await adminDb.getAll(...group.map(({ hash }) => targetRef.collection("recipients").doc(hash)));
     targetDocs.forEach((document, index) => {
       if (document.exists) existing.add(group[index].hash);
-    });
-    optOutDocs.forEach((document, index) => {
-      if (document.exists) optedOut.add(group[index].hash);
     });
   }
 
   const newCandidates = candidates.filter(({ hash }) => !existing.has(hash));
-  const queuedCandidates = newCandidates.filter(({ hash }) => !optedOut.has(hash));
   for (const group of chunks(newCandidates, 450)) {
     const batch = adminDb.batch();
     group.forEach(({ hash, phone }) => {
       batch.create(targetRef.collection("recipients").doc(hash), {
         phone,
         phoneHash: hash,
-        status: optedOut.has(hash) ? "opted_out" : "queued",
+        status: "queued",
         attemptCount: 0,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -92,8 +74,9 @@ export async function POST(
     {
       status: "ready",
       recipientCount: FieldValue.increment(newCandidates.length),
-      queuedCount: FieldValue.increment(queuedCandidates.length),
-      optedOutCount: FieldValue.increment(optedOut.size),
+      queuedCount: FieldValue.increment(newCandidates.length),
+      optedOutCount: FieldValue.increment(summary.optedOut),
+      audienceCalculation: summary,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -105,20 +88,17 @@ export async function POST(
     id,
     {
       source: targetSource,
-      uniqueContacts: String(uniquePhones.size),
+      totalContacts: String(summary.totalContacts), filterMatches: String(summary.filterMatches),
       added: String(newCandidates.length),
       duplicates: String(existing.size),
-      optedOut: String(optedOut.size),
-      invalid: String(invalid),
+      optedOut: String(summary.optedOut), invalid: String(summary.invalidPhone), noConsent: String(summary.noConsent), doNotContact: String(summary.doNotContact),
     },
   );
   return NextResponse.json({
     ok: true,
-    scanned: uniquePhones.size,
+    ...summary,
     added: newCandidates.length,
-    queued: queuedCandidates.length,
-    duplicateCount: existing.size,
-    optedOut: optedOut.size,
-    invalid,
+    queued: newCandidates.length,
+    existingCampaignRecipients: existing.size,
   });
 }

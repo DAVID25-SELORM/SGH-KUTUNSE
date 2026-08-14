@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { campaignSources, defaultFeedbackMessage } from "@/lib/feedback-campaigns";
 import { AGE_GROUPS } from "@/lib/contacts";
 
@@ -9,8 +9,10 @@ type Campaign = {
   recipientCount: number; queuedCount: number; mockedCount: number; acceptedCount: number;
   deliveredCount: number; failedCount: number; unknownCount: number; optedOutCount: number; responseCount: number;
   testSmsAccepted?: boolean; testLinkOpened?: boolean; testFeedbackSubmitted?: boolean; testVerified?: boolean;
+  audience?: Record<string, unknown>;
 };
-type Preparation = { added: number; queued: number; duplicateCount: number; invalid: number; optedOut: number };
+type AudienceSummary = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
+type Preparation = AudienceSummary & { added: number; queued: number; existingCampaignRecipients: number };
 
 const labels: Record<string, string> = {
   all_contacts: "All contacts", staff: "Staff", health_screening: "Health screening",
@@ -27,6 +29,12 @@ async function request(url: string, body?: unknown) {
   return data;
 }
 
+function AudienceCalculation({ summary, loading }: { summary: AudienceSummary | null; loading: boolean }) {
+  if (loading) return <p className="mt-5 rounded-xl bg-bg-soft p-4">Calculating the complete audience...</p>;
+  if (!summary) return <p className="mt-5 rounded-xl bg-amber-50 p-4">Audience calculation is temporarily unavailable.</p>;
+  return <section className="mt-5 rounded-2xl border bg-white p-4"><h3 className="font-semibold text-purple-deep">Audience calculation</h3><p className="mt-2 font-semibold">{summary.filterMatches} of {summary.totalContacts} contacts match your filters</p><p className="text-lg font-semibold text-emerald-800">{summary.eligible} are eligible for SMS</p><div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">{[["Active", summary.active], ["Valid mobile", summary.validMobile], ["SMS consent", summary.smsConsent], ["No consent", summary.noConsent], ["Invalid / missing phone", summary.invalidPhone], ["Opted out", summary.optedOut], ["Do not contact", summary.doNotContact], ["Duplicates", summary.duplicates], ["Other exclusions", summary.otherExclusions]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3"><strong className="block text-lg">{value}</strong>{label}</div>)}</div>{summary.eligible === 0 && <p className="mt-4 rounded-xl bg-amber-50 p-3 font-semibold">No eligible recipients. {summary.noConsent ? `${summary.noConsent} matching contacts have no recorded SMS consent.` : "Review the exclusion counts above."}</p>}</section>;
+}
+
 export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMode }: {
   initialCampaigns: Campaign[]; canSend: boolean; providerMode: "mock" | "sandbox" | "live";
 }) {
@@ -40,6 +48,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [tested, setTested] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [audienceSummary, setAudienceSummary] = useState<AudienceSummary | null>(null);
+  const [audienceLoading, setAudienceLoading] = useState(false);
   const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
 
   async function run<T>(work: () => Promise<T>, success?: string) {
@@ -49,20 +59,24 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     finally { setBusy(false); }
   }
 
+  const audienceFilters = useCallback((selectedSource = source) => { const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10); return { gender, ageGroups, source: selectedSource, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), smsConsent: true, hasPhone: true, excludeContactedSince }; }, [source, gender, ageGroups, facility, group, tags, recentDays]);
+
+  useEffect(() => {
+    if (source === "custom_list") return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => { if (!cancelled) setAudienceLoading(true); try { const summary = await request("/api/admin/feedback/audience", audienceFilters()); if (!cancelled) setAudienceSummary(summary); } catch { if (!cancelled) setAudienceSummary(null); } finally { if (!cancelled) setAudienceLoading(false); } }, 300);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [source, audienceFilters]);
+
   async function prepareRecipients() {
     const result = await run(async () => {
       const name = `${labels[source]} feedback - ${new Date().toLocaleDateString("en-GB")}`;
-      const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10);
-      const created = await request("/api/admin/feedback/campaigns", { name, source, message, audience: { gender, ageGroups, source, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), smsConsent: true, hasPhone: true, excludeContactedSince } });
+      const created = await request("/api/admin/feedback/campaigns", { name, source, message, audience: audienceFilters() });
       const campaign: Campaign = { code: created.code, name, source, message, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, unknownCount: 0, optedOutCount: 0, responseCount: 0 };
       const prepared = source === "custom_list"
         ? await request(`/api/admin/feedback/campaigns/${created.code}/recipients`, { recipients: customContacts })
         : await request(`/api/admin/feedback/campaigns/${created.code}/recipients/all`, {});
-      const summary: Preparation = {
-        added: Number(prepared.added ?? 0), queued: Number(prepared.queued ?? prepared.added - prepared.optedOut),
-        duplicateCount: Number(prepared.duplicateCount ?? 0), invalid: Number(prepared.invalid ?? prepared.invalidCount ?? 0),
-        optedOut: Number(prepared.optedOut ?? 0),
-      };
+      const summary: Preparation = { ...prepared, added: Number(prepared.added ?? 0), queued: Number(prepared.queued ?? 0), existingCampaignRecipients: Number(prepared.existingCampaignRecipients ?? 0) };
       const ready = { ...campaign, status: "ready", recipientCount: summary.added, queuedCount: summary.queued, optedOutCount: summary.optedOut };
       setActive(ready); setPreparation(summary); setItems((old) => [ready, ...old]); setTested(false);
       return ready;
@@ -104,8 +118,9 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function resumeCampaign(campaign: Campaign) {
+  async function resumeCampaign(campaign: Campaign) {
     setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice("");
+    if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
   async function reconcile(campaign: Campaign) {
@@ -149,7 +164,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
           <textarea value={customContacts} onChange={(event) => setCustomContacts(event.target.value)} rows={5} placeholder="One number per line or separated by commas" className="mt-2 w-full rounded-xl border p-3" />
         </label>}
         {source !== "custom_list" && <div className="mt-5 grid gap-4 rounded-2xl bg-bg-soft p-4 sm:grid-cols-2"><label className="font-semibold">Gender<select value={gender} onChange={e=>setGender(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"><option value="all">All</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></label><label className="font-semibold">Facility or screening event<input value={facility} onChange={e=>setFacility(e.target.value)} placeholder="Kutunse Screening - Aug 2026" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Group<input value={group} onChange={e=>setGroup(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Tags<input value={tags} onChange={e=>setTags(e.target.value)} placeholder="outreach, follow-up" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><fieldset className="sm:col-span-2"><legend className="font-semibold">Age groups</legend><div className="mt-2 flex flex-wrap gap-2">{AGE_GROUPS.map(item=><label key={item} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm"><input type="checkbox" checked={ageGroups.includes(item)} onChange={e=>setAgeGroups(old=>e.target.checked?[...old,item]:old.filter(x=>x!==item))}/>{item.replaceAll("_","–").replace("65–plus","65+").replace("under–18","Under 18")}</label>)}</div></fieldset><p className="text-sm text-text-muted sm:col-span-2">Only active contacts with valid mobile numbers and SMS consent are included. Opt-outs and do-not-contact records are always excluded.</p></div>}
-        <button disabled={busy || (source === "custom_list" && !customContacts.trim())} onClick={prepareRecipients} className="mt-5 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Preparing contacts…" : "Continue to review message"}</button>
+        {source !== "custom_list" && <AudienceCalculation summary={audienceSummary} loading={audienceLoading} />}
+        <button disabled={busy || audienceLoading || (source === "custom_list" ? !customContacts.trim() : !audienceSummary?.eligible)} onClick={prepareRecipients} className="mt-5 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Preparing contacts…" : "Continue to review message"}</button>
       </div> : <>
         <div className="mt-7 flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="text-xl font-semibold">Recipients ready</h2><p className="text-sm text-text-muted">{labels[active.source] ?? active.source}</p></div>
@@ -157,7 +173,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         </div>
         <p className="mt-4 rounded-xl bg-purple-deep p-4 text-lg font-semibold text-white">Selected audience: {active.queuedCount} contacts</p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {[["Ready", active.queuedCount], ["Duplicates removed", preparation?.duplicateCount ?? 0], ["Opted out", preparation?.optedOut ?? 0], ["Invalid", preparation?.invalid ?? 0], ["Total reviewed", (preparation?.added ?? 0) + (preparation?.duplicateCount ?? 0) + (preparation?.invalid ?? 0)]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-xl text-purple-deep">{value}</strong><small>{label}</small></div>)}
+          {[["SMS eligible", active.queuedCount], ["No consent", preparation?.noConsent ?? 0], ["Opted out", preparation?.optedOut ?? 0], ["Invalid", preparation?.invalidPhone ?? 0], ["Do not contact", preparation?.doNotContact ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-xl text-purple-deep">{value}</strong><small>{label}</small></div>)}
         </div>
 
         <div className="mt-7">

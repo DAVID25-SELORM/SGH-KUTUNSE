@@ -8,11 +8,12 @@ export const defaultFeedbackMessage = "Satellite General Hospital: Thank you for
 
 const controlledMessage = z.string().trim().min(30).max(480).refine((value) => value.includes("[SURVEY LINK]"), "Message must contain [SURVEY LINK].").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?)\b/i.test(value), "Message must not contain medical or insurance information.");
 
+export const campaignAudienceSchema = z.strictObject({ gender: z.enum(["all", "female", "male", "other", "prefer_not_to_say"]).default("all"), ageGroups: z.array(z.enum(AGE_GROUPS)).max(7).default([]), source: z.enum(campaignSources).default("all_contacts"), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]), smsConsent: z.boolean().default(true), hasPhone: z.boolean().default(true), excludeContactedSince: z.string().trim().max(10).default("") });
 export const campaignCreateSchema = z.strictObject({
   name: z.string().trim().min(3).max(120),
   source: z.enum(campaignSources),
   message: controlledMessage,
-  audience: z.strictObject({ gender: z.enum(["all", "female", "male", "other", "prefer_not_to_say"]).default("all"), ageGroups: z.array(z.enum(AGE_GROUPS)).max(7).default([]), source: z.enum(campaignSources).default("all_contacts"), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]), smsConsent: z.boolean().default(true), hasPhone: z.boolean().default(true), excludeContactedSince: z.string().trim().max(10).default("") }).optional(),
+  audience: campaignAudienceSchema.optional(),
 });
 
 export const recipientImportSchema = z.strictObject({ recipients: z.string().trim().min(1).max(12_000) });

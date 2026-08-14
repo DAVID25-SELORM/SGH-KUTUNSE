@@ -29,6 +29,43 @@ export function prepareContact(input: z.output<typeof contactSchema>) {
 }
 
 export type AudienceFilters = { gender?: string; ageGroups?: string[]; source?: string; facility?: string; group?: string; tags?: string[]; smsConsent?: boolean; hasPhone?: boolean; excludeContactedSince?: string };
+export type AudienceContact = Record<string, unknown> & { id: string };
+export type AudienceCalculation = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
+
+export function contactMatchesCampaignFilters(contact: Record<string, unknown>, filters: AudienceFilters, now = new Date()) {
+  if (filters.gender && filters.gender !== "all" && contact.gender !== filters.gender) return false;
+  if (filters.ageGroups?.length && !filters.ageGroups.includes(String(contact.ageGroup ?? ""))) return false;
+  if (filters.source && !["all_contacts", "custom_list"].includes(filters.source) && ![contact.source, ...(Array.isArray(contact.sources) ? contact.sources : [])].includes(filters.source)) return false;
+  if (filters.facility && String(contact.facility ?? "").toLowerCase() !== filters.facility.toLowerCase()) return false;
+  if (filters.group && String(contact.group ?? "").toLowerCase() !== filters.group.toLowerCase()) return false;
+  const tags = Array.isArray(contact.tags) ? contact.tags.map(String) : [];
+  if (filters.tags?.length && !filters.tags.every(tag => tags.includes(tag.toLowerCase()))) return false;
+  if (filters.excludeContactedSince) { const last = (contact.lastContactedAt as { toDate?: () => Date })?.toDate?.() ?? (contact.lastContactedAt ? new Date(String(contact.lastContactedAt)) : null); const cutoff = new Date(filters.excludeContactedSince); if (last && last >= cutoff && cutoff <= now) return false; }
+  return true;
+}
+
+export function resolveSmsAudience(contacts: AudienceContact[], filters: AudienceFilters, optedOutIds = new Set<string>(), now = new Date()) {
+  const matching = contacts.filter(contact => contactMatchesCampaignFilters(contact, filters, now));
+  const result: AudienceCalculation = { totalContacts: contacts.length, filterMatches: matching.length, active: 0, validMobile: 0, smsConsent: 0, eligible: 0, noConsent: 0, invalidPhone: 0, optedOut: 0, doNotContact: 0, duplicates: 0, otherExclusions: 0 };
+  const seenPhones = new Set<string>();
+  const eligibleContacts: AudienceContact[] = [];
+  for (const contact of matching) {
+    if (contact.status !== "active") { result.otherExclusions++; continue; }
+    result.active++;
+    const phone = normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? ""));
+    if (!phone) { result.invalidPhone++; continue; }
+    result.validMobile++;
+    if (contact.smsOptIn === true) result.smsConsent++;
+    if (contact.doNotContact === true) { result.doNotContact++; continue; }
+    if (contact.smsOptIn !== true) { result.noConsent++; continue; }
+    const key = contact.id || phone;
+    if (optedOutIds.has(key)) { result.optedOut++; continue; }
+    if (seenPhones.has(phone)) { result.duplicates++; continue; }
+    seenPhones.add(phone); result.eligible++; eligibleContacts.push(contact);
+  }
+  return { summary: result, eligibleContacts };
+}
+export function calculateSmsAudience(contacts: AudienceContact[], filters: AudienceFilters, optedOutIds = new Set<string>(), now = new Date()) { return resolveSmsAudience(contacts, filters, optedOutIds, now).summary; }
 export type ContactDirectoryFilters = { q?: string; source?: string; gender?: string; ageGroup?: string; facility?: string; tag?: string; consent?: string; status?: string };
 export function contactMatchesDirectoryFilters(contact: Record<string, unknown>, filters: ContactDirectoryFilters) {
   const q = String(filters.q ?? "").trim().toLowerCase();
@@ -47,12 +84,5 @@ export function contactMatchesAudience(contact: Record<string, unknown>, filters
   if (contact.status !== "active" || contact.doNotContact === true) return false;
   if (filters.smsConsent && contact.smsOptIn !== true) return false;
   if (filters.hasPhone && !normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? ""))) return false;
-  if (filters.gender && filters.gender !== "all" && contact.gender !== filters.gender) return false;
-  if (filters.ageGroups?.length && !filters.ageGroups.includes(String(contact.ageGroup ?? ""))) return false;
-  if (filters.source && filters.source !== "all_contacts" && ![contact.source, ...(Array.isArray(contact.sources) ? contact.sources : [])].includes(filters.source)) return false;
-  if (filters.facility && String(contact.facility ?? "").toLowerCase() !== filters.facility.toLowerCase()) return false;
-  if (filters.group && String(contact.group ?? "").toLowerCase() !== filters.group.toLowerCase()) return false;
-  const tags = Array.isArray(contact.tags) ? contact.tags.map(String) : []; if (filters.tags?.length && !filters.tags.every(tag => tags.includes(tag.toLowerCase()))) return false;
-  if (filters.excludeContactedSince) { const last = (contact.lastContactedAt as { toDate?: () => Date })?.toDate?.() ?? (contact.lastContactedAt ? new Date(String(contact.lastContactedAt)) : null); const cutoff = new Date(filters.excludeContactedSince); if (last && last >= cutoff && cutoff <= now) return false; }
-  return true;
+  return contactMatchesCampaignFilters(contact, filters, now);
 }

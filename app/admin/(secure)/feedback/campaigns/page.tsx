@@ -21,6 +21,7 @@ export default async function Page() {
       optedOutCount: Number(data.optedOutCount || 0), responseCount: Number(data.responseCount || 0),
       testSmsAccepted: Boolean(data.testSmsAcceptedAt), testLinkOpened: Boolean(data.testLinkOpenedAt),
       testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt), testVerified: data.testVerified === true,
+      audience: data.audience && typeof data.audience === "object" ? data.audience : undefined,
     };
   });
   return <section>
