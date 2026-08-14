@@ -13,6 +13,7 @@ service cloud.firestore {
     match /submission_references/{document=**} { allow read, write: if false; }
     match /feedback_responses/{document=**} { allow read, write: if false; }
     match /feedback_campaigns/{document=**} { allow read, write: if false; }
+    match /sms_opt_outs/{document=**} { allow read, write: if false; }
 
     function published() { return resource.data.status == 'published'; }
     match /doctors/{id} { allow read: if published(); allow write: if false; }

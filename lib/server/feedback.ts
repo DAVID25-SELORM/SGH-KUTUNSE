@@ -50,6 +50,11 @@ export async function createFeedback(data: FeedbackInput) {
           createdAt: now,
           safeMetadata: { source: data.source },
         });
+        if (data.campaign) {
+          const campaignRef = adminDb.collection("feedback_campaigns").doc(data.campaign);
+          const campaign = await t.get(campaignRef);
+          if (campaign.exists) t.update(campaignRef, { responseCount: FieldValue.increment(1), updatedAt: now });
+        }
       });
       return reference;
     } catch (e) {

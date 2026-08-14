@@ -26,6 +26,16 @@ The campaign admin includes downloadable PNG QR generation for reception, OPD, s
 
 ## App Check console steps
 
+## Feedback campaign workflow
+
+Campaigns are stored in `feedback_campaigns/{code}` with restricted `recipients/{phoneHash}` subcollections. Authorized campaign managers can create drafts and import consented Ghana numbers. Normalization, duplicate prevention, global `sms_opt_outs` checks, status counts, and minimal audits run server-side. Only users with `feedback_sms` can initiate mock processing; typed recipient-count confirmation and an atomic campaign-status claim prevent repeated batch starts.
+
+Campaign links contain only a random campaign code and a non-identifying source. They never contain phone numbers, names, patient IDs, or medical identifiers. Individual invitation tokens are not implemented, so an anonymous response cannot be correlated back to an imported recipient. Campaign response counts are incremented only when the supplied random campaign code matches an existing campaign.
+
+`MockSmsProvider` remains the only provider. Draft creation, preview, import, mock test, and idempotent mock batches work locally, but live SMS is structurally disabled. A future Ghana-compatible adapter needs an approved sender ID, server-side API credentials, documented provider-acceptance versus handset-delivery semantics, signed delivery webhooks, and approved opt-out/retention handling. Suggested server-only variables are `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID`, and `SMS_WEBHOOK_SECRET`.
+
+Before production, hospital governance must approve feedback/privacy/SMS wording, access to ordinary and restricted receipt feedback, the follow-up SLA, retention/TTL, escalation and opt-out rules. App Check or equivalent distributed abuse controls must be enforced and preview browser QA completed. Rollback is a code rollback plus disabling the provider; responses must not be deleted without an approved retention process. The Google Form remains untouched.
+
 1. In Google Cloud Console, enable reCAPTCHA Enterprise and create a website key for the approved production and App Hosting preview domains.
 2. In Firebase Console → App Check → Apps, register the SGH web app with that reCAPTCHA Enterprise key.
 3. Add the key as `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY` in the App Hosting backend environment.

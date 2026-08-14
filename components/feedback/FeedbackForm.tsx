@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { feedbackSchema, type FeedbackInput, type FeedbackFormInput } from "@/lib/validation";
@@ -20,6 +20,16 @@ const ratingLabels = {
   communication: "Clarity of explanations / instructions",
   overallQuality: "Overall quality of care",
 } as const;
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="mt-2 text-sm font-semibold text-red-700">
+      {message}
+    </p>
+  );
+}
+
 export function FeedbackForm() {
   const [step, setStep] = useState(1);
   const [reference, setReference] = useState("");
@@ -28,6 +38,8 @@ export function FeedbackForm() {
     register,
     watch,
     handleSubmit,
+    setValue,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<FeedbackFormInput, unknown, FeedbackInput>({
     resolver: zodResolver(feedbackSchema),
@@ -44,6 +56,13 @@ export function FeedbackForm() {
       },
     },
   });
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const campaign = query.get("campaign") ?? "";
+    const source = query.get("source") ?? "";
+    if (/^[A-Za-z0-9_-]{1,80}$/.test(campaign)) setValue("campaign", campaign);
+    if (["website", "health_screening", "facility", "qr", "sms"].includes(source)) setValue("source", source as FeedbackFormInput["source"]);
+  }, [setValue]);
   const visit = watch("visitType"),
     service = watch("serviceUnit"),
     sat = watch("overallSatisfaction"),
@@ -101,22 +120,29 @@ export function FeedbackForm() {
             <legend className="font-semibold">
               What type of service did you receive?
             </legend>
-            <label className="mt-3 block">
+            <label className="mt-3 block cursor-pointer">
               <input
+                className="peer sr-only"
                 type="radio"
                 value="health_screening"
                 {...register("visitType")}
-              />{" "}
-              Health Screening
+              />
+              <span className="flex min-h-12 items-center rounded-xl border border-border-default px-4 transition peer-checked:border-purple-deep peer-checked:bg-purple-deep/5 peer-checked:font-semibold peer-focus-visible:ring-2 peer-focus-visible:ring-purple-deep peer-focus-visible:ring-offset-2">
+                Health Screening
+              </span>
             </label>
-            <label className="mt-3 block">
+            <label className="mt-3 block cursor-pointer">
               <input
+                className="peer sr-only"
                 type="radio"
                 value="facility_visit"
                 {...register("visitType")}
-              />{" "}
-              Hospital / Facility Visit
+              />
+              <span className="flex min-h-12 items-center rounded-xl border border-border-default px-4 transition peer-checked:border-purple-deep peer-checked:bg-purple-deep/5 peer-checked:font-semibold peer-focus-visible:ring-2 peer-focus-visible:ring-purple-deep peer-focus-visible:ring-offset-2">
+                Hospital / Facility Visit
+              </span>
             </label>
+            <FieldError message={errors.visitType?.message} />
           </fieldset>
           {visit === "facility_visit" && (
             <label className="block font-semibold">
@@ -131,6 +157,7 @@ export function FeedbackForm() {
                 ))}
                 <option>Other</option>
               </select>
+              <FieldError message={errors.serviceUnit?.message} />
             </label>
           )}
           {service === "Other" && (
@@ -140,6 +167,7 @@ export function FeedbackForm() {
                 {...register("otherService")}
                 className="mt-2 w-full rounded-xl border p-3"
               />
+              <FieldError message={errors.otherService?.message} />
             </label>
           )}
           <label className="block font-semibold">
@@ -149,6 +177,7 @@ export function FeedbackForm() {
               {...register("visitDate")}
               className="mt-2 w-full rounded-xl border p-3"
             />
+            <FieldError message={errors.visitDate?.message} />
           </label>
         </section>
       )}
@@ -160,21 +189,27 @@ export function FeedbackForm() {
               <legend className="font-semibold">{label}</legend>
               <div className="mt-2 grid grid-cols-5 gap-1">
                 {scales.map(([value, text]) => (
-                  <label
-                    key={value}
-                    className="flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-xl border p-1 text-center text-xs"
-                  >
+                  <label key={value} className="cursor-pointer">
                     <input
+                      className="peer sr-only"
                       type="radio"
                       value={value}
                       {...register(
                         `ratings.${key as keyof FeedbackInput["ratings"]}`,
                       )}
                     />
-                    <span>{text}</span>
+                    <span className="flex min-h-14 items-center justify-center rounded-xl border border-border-default p-1 text-center text-xs transition peer-checked:border-purple-deep peer-checked:bg-purple-deep peer-checked:font-semibold peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-purple-deep peer-focus-visible:ring-offset-2">
+                      {text}
+                    </span>
                   </label>
                 ))}
               </div>
+              <FieldError
+                message={
+                  errors.ratings?.[key as keyof FeedbackInput["ratings"]]
+                    ?.message
+                }
+              />
             </fieldset>
           ))}
         </section>
@@ -201,6 +236,7 @@ export function FeedbackForm() {
                 </option>
               ))}
             </select>
+            <FieldError message={errors.overallSatisfaction?.message} />
           </label>
           {sat && ["dissatisfied", "very_dissatisfied"].includes(sat) && (
             <>
@@ -210,6 +246,7 @@ export function FeedbackForm() {
                   {...register("dissatisfactionAspect")}
                   className="mt-2 w-full rounded-xl border p-3"
                 />
+                <FieldError message={errors.dissatisfactionAspect?.message} />
               </label>
               <label className="block font-semibold">
                 What happened or what could we have done better?
@@ -239,6 +276,7 @@ export function FeedbackForm() {
                 </option>
               ))}
             </select>
+            <FieldError message={errors.recommendation?.message} />
           </label>
           <label className="block font-semibold">
             Comments or suggestions
@@ -270,6 +308,7 @@ export function FeedbackForm() {
               <option value="no">No</option>
               <option value="prefer_not_to_say">Prefer not to say</option>
             </select>
+            <FieldError message={errors.receiptConcern?.message} />
           </label>
           {receipt === "yes" && (
             <div className="grid gap-3 rounded-2xl bg-bg-soft p-4 sm:grid-cols-2">
@@ -293,6 +332,9 @@ export function FeedbackForm() {
                 {...register("receiptDetails.explanation")}
                 className="rounded-xl border p-3 sm:col-span-2"
               />
+              <div className="sm:col-span-2">
+                <FieldError message={errors.receiptDetails?.explanation?.message} />
+              </div>
             </div>
           )}
           <label className="flex gap-3 rounded-xl border p-4">
@@ -332,6 +374,13 @@ export function FeedbackForm() {
               </select>
             </div>
           )}
+          {contact && (
+            <FieldError
+              message={
+                errors.contactPhone?.message ?? errors.contactEmail?.message
+              }
+            />
+          )}
           <p className="text-sm text-text-muted">
             No login is required. You may submit anonymously. Do not include
             Ghana Card, NHIS/member ID, diagnosis, medication or medical
@@ -345,7 +394,7 @@ export function FeedbackForm() {
           )}
         </section>
       )}
-      <p className="text-sm text-amber-800">
+      <p role="alert" className="text-sm font-medium text-amber-800">
         {Object.values(errors).length
           ? "Please review the required information before submitting."
           : ""}
@@ -363,7 +412,10 @@ export function FeedbackForm() {
         {step < 4 ? (
           <button
             type="button"
-            onClick={() => setStep((s) => s + 1)}
+            onClick={async () => {
+              const fields = step === 1 ? ["visitType", "serviceUnit", "otherService", "visitDate"] : step === 2 ? ["ratings"] : ["overallSatisfaction", "dissatisfactionAspect", "recommendation"];
+              if (await trigger(fields as never)) setStep((s) => s + 1);
+            }}
             className="ml-auto min-h-11 rounded-xl bg-purple-deep px-5 font-semibold text-white"
           >
             Continue

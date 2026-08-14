@@ -28,7 +28,7 @@ export function Footer() {
           <ul className="mt-4 flex flex-col gap-2.5">
             {footerQuickLinks.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className="text-sm text-white/70 hover:text-white">
+                <Link href={link.href} className="inline-flex min-h-11 items-center py-2 text-sm text-white/70 hover:text-white">
                   {link.label}
                 </Link>
               </li>
@@ -41,13 +41,13 @@ export function Footer() {
           <ul className="mt-4 flex flex-col gap-2.5">
             {footerServices.map((service) => (
               <li key={service.slug}>
-                <Link href={`/services/${service.slug}`} className="text-sm text-white/70 hover:text-white">
+                <Link href={`/services/${service.slug}`} className="inline-flex min-h-11 items-center py-2 text-sm text-white/70 hover:text-white">
                   {service.name}
                 </Link>
               </li>
             ))}
             <li>
-              <Link href="/services" className="text-sm font-medium text-white hover:text-white/80">
+              <Link href="/services" className="inline-flex min-h-11 items-center py-2 text-sm font-medium text-white hover:text-white/80">
                 View All Services →
               </Link>
             </li>
@@ -64,7 +64,7 @@ export function Footer() {
             {HOSPITAL.phones.map((phone, i) => (
               <li key={phone} className="flex items-center gap-2.5">
                 <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <a href={`tel:${HOSPITAL.phonesTel[i]}`} className="hover:text-white">
+                <a href={`tel:${HOSPITAL.phonesTel[i]}`} className="inline-flex min-h-11 items-center py-2 hover:text-white">
                   {phone}
                 </a>
               </li>
@@ -84,7 +84,7 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-5">
             {footerLegalLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-white">
+              <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center py-2 hover:text-white">
                 {link.label}
               </Link>
             ))}

@@ -26,7 +26,8 @@
     {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"visitType","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"feedback_responses","queryScope":"COLLECTION","fields":[{"fieldPath":"needsReview","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
-    {"collectionGroup":"feedback_campaigns","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
+    {"collectionGroup":"feedback_campaigns","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"recipients","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
   ],
   "fieldOverrides": []
 }
