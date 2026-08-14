@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["@google-cloud/tasks", "google-auth-library"],
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/@google-cloud/tasks/build/protos/**/*"],
+  },
   poweredByHeader: false,
   async headers() {
     return [

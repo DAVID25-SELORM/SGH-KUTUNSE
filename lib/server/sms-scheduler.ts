@@ -32,6 +32,7 @@ export function smsSchedulingEnabled() { return process.env.SMS_SCHEDULING_ENABL
 export function formatAccraSchedule(value: Date) { return new Intl.DateTimeFormat("en-GB", { timeZone: HOSPITAL_TIMEZONE, weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short" }).format(value); }
 function taskId(campaignId: string, generation: number) { return `campaign-${campaignId.replace(/[^A-Za-z0-9_-]/g, "-")}-${generation}`; }
 export function taskName(campaignId: string, generation: number) { return client.taskPath(project, location, queue, taskId(campaignId, generation)); }
+export function cloudTaskResourceName(shortTaskName: string) { return client.taskPath(project, location, queue, shortTaskName); }
 
 export async function createScheduledSmsTask(campaignId: string, generation: number, scheduledAt: Date) {
   const name = taskName(campaignId, generation);
@@ -50,6 +51,8 @@ export async function verifyScheduledTaskRequest(request: Request) {
     const ticket = await verifier.verifyIdToken({ idToken: authorization.slice(7), audience: baseUrl });
     const payload = ticket.getPayload();
     if (!payload?.email_verified || payload.email !== serviceAccountEmail) return null;
-    return { uid: `service:${payload.email}`, task };
+    // Cloud Tasks sends only the short task ID in X-CloudTasks-TaskName.
+    // Normalize it to the full resource name persisted on the campaign.
+    return { uid: `service:${payload.email}`, task: cloudTaskResourceName(task) };
   } catch { return null; }
 }
