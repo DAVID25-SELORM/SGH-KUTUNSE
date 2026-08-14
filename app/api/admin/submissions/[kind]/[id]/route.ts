@@ -9,7 +9,7 @@ import { canMutate } from "@/lib/types/admin";
 import { canTransition, PRIORITIES, submissionKinds, SUBMISSION_STATUSES, type SubmissionKind, type SubmissionStatus } from "@/lib/types/submissions";
 
 const schema = z.strictObject({ status: z.enum(SUBMISSION_STATUSES).optional(), priority: z.enum(PRIORITIES).optional(), assignedTo: z.string().trim().max(128).nullable().optional(), note: z.string().trim().min(1).max(2000).optional() });
-const actionForStatus = (status: string) => status === "contacted" ? "contacted" : status === "completed" ? "completed" : status === "archived" ? "archived" : "status_changed";
+const actionForStatus = (status: string, kind: string) => status === "contacted" ? "contacted" : status === "completed" ? "completed" : status === "archived" ? "archived" : status === "in_review" && kind === "feedback" ? "reviewed" : "status_changed";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
@@ -30,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
   const actorDisplayName = actor.name ?? actor.email ?? "Administrator";
   const events: Array<{ action: string; safeMetadata: Record<string, string | null> }> = [];
   if (requested.assignedTo !== undefined && requested.assignedTo !== current.assignedTo) events.push({ action: current.assignedTo ? "reassigned" : "assigned", safeMetadata: { from: current.assignedTo ?? null, to: requested.assignedTo ?? null } });
-  if (requested.status && requested.status !== current.status) events.push({ action: actionForStatus(requested.status), safeMetadata: { from: current.status, to: requested.status } });
+  if (requested.status && requested.status !== current.status) events.push({ action: actionForStatus(requested.status, kind), safeMetadata: { from: current.status, to: requested.status } });
   if (note) events.push({ action: "internal_note_added", safeMetadata: {} });
   await adminDb.runTransaction(async (transaction) => {
     transaction.update(ref, { ...changes, updatedAt: FieldValue.serverTimestamp(), lastActionAt: FieldValue.serverTimestamp() });
