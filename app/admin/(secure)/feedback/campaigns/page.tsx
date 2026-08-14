@@ -4,4 +4,30 @@ import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { getSmsProvider } from "@/lib/server/sms";
 import { hasPermission } from "@/lib/types/admin";
-export default async function Page(){const session=await requireAdmin("feedback_campaigns"),provider=getSmsProvider();const snapshot=await adminDb.collection("feedback_campaigns").orderBy("createdAt","desc").limit(50).get();const campaigns=snapshot.docs.map(doc=>{const d=doc.data();return{code:doc.id,name:String(d.name||"Untitled"),source:String(d.source||"other"),message:String(d.message||""),status:String(d.status||"draft"),recipientCount:Number(d.recipientCount||0),queuedCount:Number(d.queuedCount||0),mockedCount:Number(d.mockedCount||0),deliveredCount:Number(d.deliveredCount||0),failedCount:Number(d.failedCount||0),responseCount:Number(d.responseCount||0)}});return <section><p className="text-sm font-semibold text-pink-accent">PATIENT FEEDBACK</p><h1 className="text-3xl font-semibold text-purple-deep">SMS campaigns</h1><div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><strong>{provider.mode === "sandbox" ? "Arkesel sandbox - real delivery disabled" : "Mock mode - real sending disabled"}</strong><p className="mt-2 text-sm">Provider mode: {provider.mode}. Campaign planning, consented-recipient import and simulated processing are available. Live SMS remains locked until the exposed API key is rotated and a controlled real-send release is approved.</p></div><div className="mt-6"><FeedbackQr/></div><FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role,"feedback_sms")} providerMode={provider.mode}/></section>}
+
+export default async function Page() {
+  const session = await requireAdmin("feedback_campaigns");
+  const provider = getSmsProvider();
+  const snapshot = await adminDb.collection("feedback_campaigns").orderBy("createdAt", "desc").limit(50).get();
+  const campaigns = snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      code: doc.id, name: String(data.name || "Untitled"), source: String(data.source || "other"),
+      message: String(data.message || ""), status: String(data.status || "draft"),
+      recipientCount: Number(data.recipientCount || 0), queuedCount: Number(data.queuedCount || 0),
+      mockedCount: Number(data.mockedCount || 0), acceptedCount: Number(data.acceptedCount || 0),
+      deliveredCount: Number(data.deliveredCount || 0), failedCount: Number(data.failedCount || 0),
+      optedOutCount: Number(data.optedOutCount || 0), responseCount: Number(data.responseCount || 0),
+    };
+  });
+  return <section>
+    <p className="text-sm font-semibold text-pink-accent">PATIENT FEEDBACK</p>
+    <h1 className="text-3xl font-semibold text-purple-deep">Send Feedback SMS</h1>
+    <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+      <strong>Live bulk sending is safely locked</strong>
+      <p className="mt-2 text-sm">You can prepare recipients and test the workflow. Live sending remains unavailable until the Arkesel API key is rotated and securely configured.</p>
+    </div>
+    <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} />
+    <div className="mt-8"><FeedbackQr /></div>
+  </section>;
+}

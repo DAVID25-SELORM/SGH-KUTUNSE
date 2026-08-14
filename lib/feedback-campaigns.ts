@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { deduplicateRecipients, normalizeGhanaPhone } from "@/lib/sms";
 
-export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "other"] as const;
+export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "custom_list", "other"] as const;
 export const defaultFeedbackMessage = "Satellite General Hospital: Thank you for allowing us to serve you. Please take 1-2 minutes to share your experience with us. Your feedback may be submitted anonymously. [SURVEY LINK]";
 
 const controlledMessage = z.string().trim().min(30).max(480).refine((value) => value.includes("[SURVEY LINK]"), "Message must contain [SURVEY LINK].").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?)\b/i.test(value), "Message must not contain medical or insurance information.");

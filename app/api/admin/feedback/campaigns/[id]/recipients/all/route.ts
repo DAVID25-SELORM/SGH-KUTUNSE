@@ -29,18 +29,17 @@ export async function POST(
   const target = await targetRef.get();
   if (!target.exists)
     return NextResponse.json({ ok: false, message: "Campaign not found." }, { status: 404 });
-  if (target.data()?.source !== "all_contacts")
-    return NextResponse.json({ ok: false, message: "This action is available only for All contacts campaigns." }, { status: 409 });
+  const targetSource = String(target.data()?.source ?? "");
+  if (targetSource === "custom_list")
+    return NextResponse.json({ ok: false, message: "Custom lists must be supplied by the administrator." }, { status: 409 });
   if (!["draft", "ready"].includes(String(target.data()?.status)))
     return NextResponse.json({ ok: false, message: "Recipients cannot be changed after processing starts." }, { status: 409 });
 
-  const sourceCampaigns = await adminDb
-    .collection("feedback_campaigns")
-    .where("source", "!=", "all_contacts")
-    .limit(100)
-    .get();
+  const sourceCampaigns = targetSource === "all_contacts"
+    ? await adminDb.collection("feedback_campaigns").where("source", "!=", "all_contacts").limit(100).get()
+    : await adminDb.collection("feedback_campaigns").where("source", "==", targetSource).limit(100).get();
   const sourceSnapshots = await Promise.all(
-    sourceCampaigns.docs.map((campaign) =>
+    sourceCampaigns.docs.filter((campaign) => campaign.id !== id).map((campaign) =>
       campaign.ref.collection("recipients").limit(5_000).get(),
     ),
   );
@@ -104,11 +103,12 @@ export async function POST(
   );
   await writeAudit(
     actor.uid,
-    "feedback_campaign.all_contacts_aggregated",
+    "feedback_campaign.contacts_prepared",
     "feedback_campaign",
     id,
     {
-      uniqueSources: String(uniquePhones.size),
+      source: targetSource,
+      uniqueContacts: String(uniquePhones.size),
       added: String(newCandidates.length),
       duplicates: String(existing.size),
       optedOut: String(optedOut.size),
