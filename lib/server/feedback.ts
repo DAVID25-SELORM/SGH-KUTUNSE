@@ -23,7 +23,14 @@ export async function createFeedback(data: FeedbackInput) {
         const reservation = adminDb
           .collection("submission_references")
           .doc(reference);
-        if ((await t.get(reservation)).exists)
+        const campaignRef = data.campaign
+          ? adminDb.collection("feedback_campaigns").doc(data.campaign)
+          : null;
+        const [reservationSnapshot, campaignSnapshot] = await Promise.all([
+          t.get(reservation),
+          campaignRef ? t.get(campaignRef) : Promise.resolve(null),
+        ]);
+        if (reservationSnapshot.exists)
           throw new Error("REFERENCE_COLLISION");
         const safe = { ...data };
         delete safe.website;
@@ -50,11 +57,8 @@ export async function createFeedback(data: FeedbackInput) {
           createdAt: now,
           safeMetadata: { source: data.source },
         });
-        if (data.campaign) {
-          const campaignRef = adminDb.collection("feedback_campaigns").doc(data.campaign);
-          const campaign = await t.get(campaignRef);
-          if (campaign.exists) t.update(campaignRef, { responseCount: FieldValue.increment(1), updatedAt: now });
-        }
+        if (campaignRef && campaignSnapshot?.exists)
+          t.update(campaignRef, { responseCount: FieldValue.increment(1), updatedAt: now });
       });
       return reference;
     } catch (e) {
