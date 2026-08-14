@@ -7,6 +7,39 @@ import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
 
+function maskPhone(phone: string) {
+  const normalized = phone.replace(/\s/g, "");
+  if (normalized.length < 7) return "Hidden";
+  return `${normalized.slice(0, 4)}••••${normalized.slice(-4)}`;
+}
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const actor = await verifyAdminRequest("feedback_campaigns");
+  if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
+  const { id } = await context.params;
+  const campaignRef = adminDb.collection("feedback_campaigns").doc(id);
+  if (!(await campaignRef.get()).exists)
+    return NextResponse.json({ ok: false, message: "Campaign not found." }, { status: 404 });
+  const snapshot = await campaignRef
+    .collection("recipients")
+    .orderBy("createdAt", "desc")
+    .limit(100)
+    .get();
+  return NextResponse.json({
+    ok: true,
+    recipients: snapshot.docs.map((document) => ({
+      id: document.id,
+      phone: maskPhone(String(document.data().phone ?? "")),
+      status: String(document.data().status ?? "unknown"),
+      attemptCount: Number(document.data().attemptCount ?? 0),
+    })),
+    limited: snapshot.size === 100,
+  });
+}
+
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const actor = await verifyAdminRequest("feedback_campaigns");
