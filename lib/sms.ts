@@ -3,7 +3,7 @@ export type SmsResult = {
   status: "mocked" | "accepted" | "failed";
 };
 export interface SmsProvider {
-  mode: "mock" | "live";
+  mode: "mock" | "sandbox" | "live";
   sendMessage(
     to: string,
     message: string,

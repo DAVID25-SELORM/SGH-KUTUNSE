@@ -42,3 +42,19 @@ env:
     value: "48"
     availability:
       - RUNTIME
+  - variable: SMS_PROVIDER
+    value: arkesel
+    availability:
+      - RUNTIME
+  - variable: SMS_SENDER_ID
+    value: SGH-KUTUNSE
+    availability:
+      - RUNTIME
+  - variable: SMS_SANDBOX
+    value: "true"
+    availability:
+      - RUNTIME
+  - variable: SMS_API_KEY
+    secret: SMS_API_KEY
+    availability:
+      - RUNTIME

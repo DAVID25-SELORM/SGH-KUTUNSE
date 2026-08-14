@@ -21,14 +21,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!snapshot.exists) return NextResponse.json({ ok: false }, { status: 404 });
   const campaign = snapshot.data()!;
   const provider = getSmsProvider();
-  if (provider.mode !== "mock") return NextResponse.json({ ok: false, message: "Live SMS requires a separately approved production release." }, { status: 409 });
+  if (provider.mode === "live") return NextResponse.json({ ok: false, message: "Live SMS requires a separately approved production release." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
   if (parsed.data.action === "test") {
     const phone = normalizeGhanaPhone(parsed.data.testPhone ?? "");
     if (!phone || parsed.data.confirmation !== "SEND TEST") return NextResponse.json({ ok: false, message: "Enter a valid Ghana number and type SEND TEST." }, { status: 400 });
     const result = await provider.sendMessage(phone, message, `test-${id}-${Date.now()}`);
-    await writeAudit(actor.uid, "feedback_campaign.mock_test", "feedback_campaign", id);
-    return NextResponse.json({ ok: true, status: result.status });
+    await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
+    return NextResponse.json({ ok: true, status: result.status, mode: provider.mode });
   }
   const recipients = await ref.collection("recipients").where("status", "==", "queued").limit(400).get();
   const expected = Number(campaign.queuedCount ?? recipients.size);
@@ -36,16 +36,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (recipients.empty) return NextResponse.json({ ok: false, message: "There are no queued recipients." }, { status: 409 });
   const claimed = await adminDb.runTransaction(async (transaction) => {
     const fresh = await transaction.get(ref);
-    if (!["ready", "mock_failed"].includes(String(fresh.data()?.status))) return false;
-    transaction.update(ref, { status: "mock_processing", processingBy: actor.uid, updatedAt: FieldValue.serverTimestamp() });
+    if (!["ready", "mock_failed", "sandbox_failed"].includes(String(fresh.data()?.status))) return false;
+    transaction.update(ref, { status: `${provider.mode}_processing`, processingBy: actor.uid, updatedAt: FieldValue.serverTimestamp() });
     return true;
   });
   if (!claimed) return NextResponse.json({ ok: false, message: "This campaign was already started." }, { status: 409 });
   const results = await provider.sendBatch(recipients.docs.map((doc) => ({ to: String(doc.data().phone), message, idempotencyKey: `${id}-${doc.id}` })));
+  const mocked = results.filter((result) => result.status === "mocked").length;
+  const failed = results.filter((result) => result.status === "failed").length;
   const batch = adminDb.batch();
   recipients.docs.forEach((doc, index) => batch.update(doc.ref, { status: results[index].status, providerId: results[index].providerId, attemptCount: FieldValue.increment(1), attemptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }));
-  batch.update(ref, { status: "mock_complete", mockedCount: FieldValue.increment(results.length), queuedCount: FieldValue.increment(-results.length), updatedAt: FieldValue.serverTimestamp() });
+  batch.update(ref, { status: `${provider.mode}_complete`, mockedCount: FieldValue.increment(mocked), failedCount: FieldValue.increment(failed), queuedCount: FieldValue.increment(-results.length), updatedAt: FieldValue.serverTimestamp() });
   await batch.commit();
-  await writeAudit(actor.uid, "feedback_campaign.mock_batch_started", "feedback_campaign", id, { recipientCount: String(results.length) });
-  return NextResponse.json({ ok: true, processed: results.length, mode: "mock" });
+  await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_batch_started`, "feedback_campaign", id, { recipientCount: String(results.length) });
+  return NextResponse.json({ ok: true, processed: results.length, mode: provider.mode });
 }
