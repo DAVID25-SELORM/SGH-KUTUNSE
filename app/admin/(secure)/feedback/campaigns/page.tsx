@@ -1,5 +1,6 @@
 import { FeedbackCampaignManager } from "@/components/admin/FeedbackCampaignManager";
 import { FeedbackQr } from "@/components/admin/FeedbackQr";
+import { ConsentMigrationPanel } from "@/components/admin/ConsentMigrationPanel";
 import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { getSmsProvider } from "@/lib/server/sms";
@@ -32,6 +33,7 @@ export default async function Page() {
       <p className="mt-2 text-sm">After the test recipient opens the secure link and submits feedback successfully, bulk sending unlocks automatically.</p>
     </div>
     <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} />
+    {session.role === "super_admin" ? <ConsentMigrationPanel /> : null}
     <div className="mt-8"><FeedbackQr /></div>
   </section>;
 }

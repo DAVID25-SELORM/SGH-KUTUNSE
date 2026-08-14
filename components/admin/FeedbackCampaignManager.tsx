@@ -59,7 +59,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     finally { setBusy(false); }
   }
 
-  const audienceFilters = useCallback((selectedSource = source) => { const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10); return { gender, ageGroups, source: selectedSource, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), smsConsent: true, hasPhone: true, excludeContactedSince }; }, [source, gender, ageGroups, facility, group, tags, recentDays]);
+  const audienceFilters = useCallback((selectedSource = source) => { const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10); return { gender, ageGroups, source: selectedSource, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), purpose: "feedback_request" as const, smsConsent: true, hasPhone: true, excludeContactedSince }; }, [source, gender, ageGroups, facility, group, tags, recentDays]);
 
   useEffect(() => {
     if (source === "custom_list") return;
@@ -120,7 +120,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
   async function resumeCampaign(campaign: Campaign) {
     setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice("");
-    if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
+    if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
   async function reconcile(campaign: Campaign) {

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   try {
     const data = prepareContact(parsed.data); const id = recipientKey(data.normalizedPhone); const ref = adminDb.collection("feedback_contacts").doc(id); const current = await ref.get();
     if (current.exists) return NextResponse.json({ ok: false, message: "That phone number already belongs to an existing contact.", id }, { status: 409 });
-    await ref.create({ ...data, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedBy: actor.uid });
+    await ref.create({ ...data, ...(data.smsConsentStatus !== "unknown" ? { smsConsentRecordedBy: actor.uid, smsConsentUpdatedAt: FieldValue.serverTimestamp() } : {}), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedBy: actor.uid });
     await writeAudit(actor.uid, "contact.created", "contact", id, { source: data.source });
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (error) { return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "Contact could not be saved." }, { status: 400 }); }

@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { campaignLink, campaignSendSchema } from "@/lib/feedback-campaigns";
+import { hasSmsConsentForPurpose, type SmsConsentScope } from "@/lib/contacts";
 import { normalizeGhanaPhone } from "@/lib/sms";
 import type { SmsResult } from "@/lib/sms";
 import { verifyAdminRequest } from "@/lib/server/auth";
@@ -13,7 +14,7 @@ import { getSmsProvider } from "@/lib/server/sms";
 
 export const maxDuration = 300;
 
-async function recalculateEligible(ref: FirebaseFirestore.DocumentReference) {
+async function recalculateEligible(ref: FirebaseFirestore.DocumentReference, purpose: SmsConsentScope) {
   const snapshot = await ref.collection("recipients").where("status", "==", "queued").limit(5_001).get();
   if (snapshot.size > 5_000) throw new Error("AUDIENCE_LIMIT");
   const eligible: FirebaseFirestore.QueryDocumentSnapshot[] = [];
@@ -27,7 +28,7 @@ async function recalculateEligible(ref: FirebaseFirestore.DocumentReference) {
     group.forEach((doc, index) => {
       if (!normalizeGhanaPhone(String(doc.data().phone ?? ""))) excluded.push({ doc, status: "invalid" });
       else if (optOuts[index].exists) excluded.push({ doc, status: "opted_out" });
-      else if (contacts[index].exists && (contacts[index].data()?.status !== "active" || contacts[index].data()?.doNotContact === true || contacts[index].data()?.smsOptIn !== true)) excluded.push({ doc, status: "skipped" });
+      else if (contacts[index].exists && (contacts[index].data()?.status !== "active" || contacts[index].data()?.doNotContact === true || !hasSmsConsentForPurpose(contacts[index].data()!, purpose))) excluded.push({ doc, status: "skipped" });
       else eligible.push(doc);
     });
   }
@@ -74,7 +75,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
   let recalculated;
-  try { recalculated = await recalculateEligible(ref); }
+  try { recalculated = await recalculateEligible(ref, String(campaign.audience?.purpose ?? "feedback_request") as SmsConsentScope); }
   catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 }); throw error; }
   const expected = recalculated.eligible.length;
   if (parsed.data.action === "preview") return NextResponse.json({ ok: true, eligibleCount: expected, excludedCount: recalculated.excluded.length });

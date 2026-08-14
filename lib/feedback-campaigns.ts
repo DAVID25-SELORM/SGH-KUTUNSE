@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { deduplicateRecipients, normalizeGhanaPhone } from "@/lib/sms";
-import { AGE_GROUPS } from "@/lib/contacts";
+import { AGE_GROUPS, SMS_CONSENT_SCOPES } from "@/lib/contacts";
 
 export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "custom_list", "other"] as const;
 export const defaultFeedbackMessage = "Satellite General Hospital: Thank you for allowing us to serve you. Please take 1-2 minutes to share your experience with us. Your feedback may be submitted anonymously. [SURVEY LINK]";
 
 const controlledMessage = z.string().trim().min(30).max(480).refine((value) => value.includes("[SURVEY LINK]"), "Message must contain [SURVEY LINK].").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?)\b/i.test(value), "Message must not contain medical or insurance information.");
 
-export const campaignAudienceSchema = z.strictObject({ gender: z.enum(["all", "female", "male", "other", "prefer_not_to_say"]).default("all"), ageGroups: z.array(z.enum(AGE_GROUPS)).max(7).default([]), source: z.enum(campaignSources).default("all_contacts"), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]), smsConsent: z.boolean().default(true), hasPhone: z.boolean().default(true), excludeContactedSince: z.string().trim().max(10).default("") });
+export const campaignAudienceSchema = z.strictObject({ gender: z.enum(["all", "female", "male", "other", "prefer_not_to_say"]).default("all"), ageGroups: z.array(z.enum(AGE_GROUPS)).max(7).default([]), source: z.enum(campaignSources).default("all_contacts"), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]), purpose: z.enum(SMS_CONSENT_SCOPES).default("feedback_request"), smsConsent: z.boolean().default(true), hasPhone: z.boolean().default(true), excludeContactedSince: z.string().trim().max(10).default("") });
 export const campaignCreateSchema = z.strictObject({
   name: z.string().trim().min(3).max(120),
   source: z.enum(campaignSources),

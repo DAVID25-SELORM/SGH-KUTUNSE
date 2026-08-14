@@ -4,12 +4,14 @@ import { normalizeGhanaPhone } from "./sms";
 export const AGE_GROUPS = ["under_18", "18_24", "25_34", "35_44", "45_54", "55_64", "65_plus"] as const;
 export const CONTACT_SOURCES = ["staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "other"] as const;
 export const GENDERS = ["", "female", "male", "other", "prefer_not_to_say"] as const;
+export const SMS_CONSENT_SCOPES = ["feedback_request", "health_screening_followup", "service_followup"] as const;
+export const SMS_CONSENT_STATUSES = ["unknown", "opted_in", "opted_out"] as const;
 
 export const contactSchema = z.strictObject({
   fullName: z.string().trim().max(120).default(""), phone: z.string().trim().min(10).max(30), email: z.union([z.literal(""), z.email()]).default(""),
   gender: z.enum(GENDERS).default(""), dateOfBirth: z.string().trim().max(10).default(""), age: z.union([z.literal(""), z.coerce.number().int().min(0).max(125)]).default(""), ageGroup: z.enum(["", ...AGE_GROUPS]).default(""),
   source: z.enum(CONTACT_SOURCES), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(30).default([]),
-  smsOptIn: z.boolean().default(false), emailOptIn: z.boolean().default(false), doNotContact: z.boolean().default(false), notes: z.string().trim().max(3000).default(""), status: z.enum(["active", "archived"]).default("active"),
+  smsOptIn: z.boolean().default(false), smsConsentStatus: z.enum(SMS_CONSENT_STATUSES).default("unknown"), smsConsentSource: z.enum(["", ...CONTACT_SOURCES]).default(""), smsConsentScope: z.array(z.enum(SMS_CONSENT_SCOPES)).max(3).default([]), smsConsentDate: z.string().trim().max(10).default(""), smsConsentEvidenceNote: z.string().trim().max(500).default(""), emailOptIn: z.boolean().default(false), doNotContact: z.boolean().default(false), notes: z.string().trim().max(3000).default(""), status: z.enum(["active", "archived"]).default("active"),
 });
 export const contactMergeSchema = z.strictObject({ targetId: z.string().regex(/^[a-f0-9]{64}$/) });
 
@@ -28,9 +30,16 @@ export function prepareContact(input: z.output<typeof contactSchema>) {
   return { ...input, phone: normalizedPhone, normalizedPhone, age, ageGroup, sources: [input.source], tags: [...new Set(input.tags.map(tag => tag.toLowerCase()))] };
 }
 
-export type AudienceFilters = { gender?: string; ageGroups?: string[]; source?: string; facility?: string; group?: string; tags?: string[]; smsConsent?: boolean; hasPhone?: boolean; excludeContactedSince?: string };
+export type SmsConsentScope = (typeof SMS_CONSENT_SCOPES)[number];
+export type AudienceFilters = { gender?: string; ageGroups?: string[]; source?: string; facility?: string; group?: string; tags?: string[]; purpose?: SmsConsentScope; smsConsent?: boolean; hasPhone?: boolean; excludeContactedSince?: string };
 export type AudienceContact = Record<string, unknown> & { id: string };
 export type AudienceCalculation = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
+
+export function hasSmsConsentForPurpose(contact: Record<string, unknown>, purpose: SmsConsentScope = "feedback_request") {
+  if (contact.smsConsentStatus === "opted_out") return false;
+  if (contact.smsConsentStatus === "opted_in") return Array.isArray(contact.smsConsentScope) && contact.smsConsentScope.map(String).includes(purpose);
+  return contact.smsOptIn === true;
+}
 
 export function contactMatchesCampaignFilters(contact: Record<string, unknown>, filters: AudienceFilters, now = new Date()) {
   if (filters.gender && filters.gender !== "all" && contact.gender !== filters.gender) return false;
@@ -55,9 +64,10 @@ export function resolveSmsAudience(contacts: AudienceContact[], filters: Audienc
     const phone = normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? ""));
     if (!phone) { result.invalidPhone++; continue; }
     result.validMobile++;
-    if (contact.smsOptIn === true) result.smsConsent++;
+    const hasConsent = hasSmsConsentForPurpose(contact, filters.purpose);
+    if (hasConsent) result.smsConsent++;
     if (contact.doNotContact === true) { result.doNotContact++; continue; }
-    if (contact.smsOptIn !== true) { result.noConsent++; continue; }
+    if (!hasConsent) { result.noConsent++; continue; }
     const key = contact.id || phone;
     if (optedOutIds.has(key)) { result.optedOut++; continue; }
     if (seenPhones.has(phone)) { result.duplicates++; continue; }
@@ -78,11 +88,11 @@ export function contactMatchesDirectoryFilters(contact: Record<string, unknown>,
     (!filters.status || contact.status === filters.status);
 }
 export function isSmsEligibleContact(contact: Record<string, unknown>) {
-  return contact.status === "active" && contact.smsOptIn === true && contact.doNotContact !== true && Boolean(normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? "")));
+  return contact.status === "active" && hasSmsConsentForPurpose(contact) && contact.doNotContact !== true && Boolean(normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? "")));
 }
 export function contactMatchesAudience(contact: Record<string, unknown>, filters: AudienceFilters, now = new Date()) {
   if (contact.status !== "active" || contact.doNotContact === true) return false;
-  if (filters.smsConsent && contact.smsOptIn !== true) return false;
+  if (filters.smsConsent && !hasSmsConsentForPurpose(contact, filters.purpose)) return false;
   if (filters.hasPhone && !normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? ""))) return false;
   return contactMatchesCampaignFilters(contact, filters, now);
 }
