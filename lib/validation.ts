@@ -123,7 +123,9 @@ export const feedbackSchema = z
     ]),
     comments: optional(2000),
     appreciation: optional(1000),
-    receiptConcern: z.enum(["yes", "no", "prefer_not_to_say"]),
+    receiptConcern: z.enum(["yes", "no", "prefer_not_to_say"], {
+      error: "Please select an answer.",
+    }),
     receiptDetails: z
       .strictObject({
         unit: optional(120),

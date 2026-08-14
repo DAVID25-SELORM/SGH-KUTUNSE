@@ -40,6 +40,7 @@ export function FeedbackForm() {
     handleSubmit,
     setValue,
     trigger,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FeedbackFormInput, unknown, FeedbackInput>({
     resolver: zodResolver(feedbackSchema),
@@ -414,7 +415,10 @@ export function FeedbackForm() {
             type="button"
             onClick={async () => {
               const fields = step === 1 ? ["visitType", "serviceUnit", "otherService", "visitDate"] : step === 2 ? ["ratings"] : ["overallSatisfaction", "dissatisfactionAspect", "recommendation"];
-              if (await trigger(fields as never)) setStep((s) => s + 1);
+              if (await trigger(fields as never)) {
+                clearErrors();
+                setStep((s) => s + 1);
+              }
             }}
             className="ml-auto min-h-11 rounded-xl bg-purple-deep px-5 font-semibold text-white"
           >
