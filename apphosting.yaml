@@ -58,6 +58,35 @@ env:
     value: "false"
     availability:
       - RUNTIME
+  - variable: SMS_SCHEDULING_ENABLED
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: APP_BASE_URL
+    value: https://www.satellitegeneralhospital.com
+    availability:
+      - RUNTIME
+  - variable: SMS_TASK_LOCATION
+    value: us-east4
+    availability:
+      - RUNTIME
+  - variable: SMS_TASK_QUEUE
+    value: sgh-sms-schedules
+    availability:
+      - RUNTIME
+  - variable: SMS_TASK_SERVICE_ACCOUNT
+    value: firebase-app-hosting-compute@satelitegeneralhospital.iam.gserviceaccount.com
+    availability:
+      - RUNTIME
+  - variable: SMS_SEND_START_HOUR
+    value: "8"
+    availability:
+      - RUNTIME
+  - variable: SMS_SEND_END_HOUR
+    value: "19"
+    availability:
+      - RUNTIME
   - variable: SMS_API_KEY
     secret: SMS_API_KEY
     availability:

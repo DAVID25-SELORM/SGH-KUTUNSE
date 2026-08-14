@@ -20,11 +20,13 @@
     "emulators": "firebase emulators:start --only auth,firestore"
   },
   "dependencies": {
+    "@google-cloud/tasks": "^6.2.1",
     "@hookform/resolvers": "^5.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.17.1",
     "firebase-admin": "^14.2.0",
     "framer-motion": "^13.0.0",
+    "google-auth-library": "^10.4.0",
     "lucide-react": "^1.30.0",
     "next": "16.3.0",
     "qrcode": "^1.5.4",

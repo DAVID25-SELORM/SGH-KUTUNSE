@@ -10,6 +10,7 @@ type Campaign = {
   deliveredCount: number; failedCount: number; unknownCount: number; optedOutCount: number; responseCount: number;
   testSmsAccepted?: boolean; testLinkOpened?: boolean; testFeedbackSubmitted?: boolean; testVerified?: boolean;
   audience?: Record<string, unknown>;
+  scheduledAt?: string; scheduledTimezone?: string; originalEligibleCount?: number;
 };
 type AudienceSummary = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
 type Preparation = AudienceSummary & { added: number; queued: number; existingCampaignRecipients: number };
@@ -35,8 +36,8 @@ function AudienceCalculation({ summary, loading }: { summary: AudienceSummary | 
   return <section className="mt-5 rounded-2xl border bg-white p-4"><h3 className="font-semibold text-purple-deep">Audience calculation</h3><p className="mt-2 font-semibold">{summary.filterMatches} of {summary.totalContacts} contacts match your filters</p><p className="text-lg font-semibold text-emerald-800">{summary.eligible} are eligible for SMS</p><div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">{[["Active", summary.active], ["Valid mobile", summary.validMobile], ["SMS consent", summary.smsConsent], ["No consent", summary.noConsent], ["Invalid / missing phone", summary.invalidPhone], ["Opted out", summary.optedOut], ["Do not contact", summary.doNotContact], ["Duplicates", summary.duplicates], ["Other exclusions", summary.otherExclusions]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3"><strong className="block text-lg">{value}</strong>{label}</div>)}</div>{summary.eligible === 0 && <p className="mt-4 rounded-xl bg-amber-50 p-3 font-semibold">No eligible recipients. {summary.noConsent ? `${summary.noConsent} matching contacts have no recorded SMS consent.` : "Review the exclusion counts above."}</p>}</section>;
 }
 
-export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMode }: {
-  initialCampaigns: Campaign[]; canSend: boolean; providerMode: "mock" | "sandbox" | "live";
+export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMode, schedulingEnabled }: {
+  initialCampaigns: Campaign[]; canSend: boolean; providerMode: "mock" | "sandbox" | "live"; schedulingEnabled: boolean;
 }) {
   const [items, setItems] = useState(initialCampaigns);
   const [source, setSource] = useState<(typeof campaignSources)[number]>("health_screening");
@@ -50,6 +51,9 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [busy, setBusy] = useState(false);
   const [audienceSummary, setAudienceSummary] = useState<AudienceSummary | null>(null);
   const [audienceLoading, setAudienceLoading] = useState(false);
+  const [deliveryOption, setDeliveryOption] = useState<"now" | "schedule">("now");
+  const [scheduleDate, setScheduleDate] = useState(""), [scheduleTime, setScheduleTime] = useState("");
+  const [editingSchedule, setEditingSchedule] = useState(false);
   const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
 
   async function run<T>(work: () => Promise<T>, success?: string) {
@@ -118,8 +122,29 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
+  async function scheduleCampaign(action: "schedule" | "reschedule" = "schedule") {
+    if (!active?.testVerified || !window.confirm(`${action === "reschedule" ? "Reschedule" : "Schedule"} this campaign for ${scheduleDate} at ${scheduleTime} Africa/Accra?`)) return;
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/schedule`, { action, date: scheduleDate, time: scheduleTime, timezone: "Africa/Accra" });
+      const scheduled = { status: "scheduled", scheduledAt: String(result.scheduledAt), scheduledTimezone: "Africa/Accra", originalEligibleCount: Number(result.eligibleCount) };
+      setActive(current => current ? { ...current, ...scheduled } : current);
+      setItems(old => old.map(item => item.code === active.code ? { ...item, ...scheduled } : item));
+      setEditingSchedule(false);
+      setNotice(`Campaign scheduled for ${result.scheduledLabel}. Eligibility will be checked again immediately before sending.`);
+    });
+  }
+
+  async function cancelSchedule() {
+    if (!active || !window.confirm("Cancel this scheduled SMS campaign? No messages will be sent by this schedule.")) return;
+    await run(async () => {
+      await request(`/api/admin/feedback/campaigns/${active.code}/schedule`, { action: "cancel", date: "", time: "", timezone: "Africa/Accra" });
+      setActive(current => current ? { ...current, status: "cancelled", scheduledAt: undefined } : current);
+      setItems(old => old.map(item => item.code === active.code ? { ...item, status: "cancelled", scheduledAt: undefined } : item));
+    }, "Scheduled send cancelled.");
+  }
+
   async function resumeCampaign(campaign: Campaign) {
-    setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice("");
+    setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
     if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
@@ -133,7 +158,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); }
+  function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
 
   const steps = ["Audience", "Message", "Test", "Send", "Results"];
   const currentStep = !active ? 1 : !tested ? 2 : !active.testVerified ? 3 : active.status === "completed" ? 5 : 4;
@@ -200,7 +225,9 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
             <li>{active.testVerified ? "✅ Test verified — Bulk SMS is ready" : "○ Waiting for successful test feedback submission"}</li>
           </ul>
           <p className={`mt-4 font-semibold ${active.testVerified ? "text-emerald-800" : "text-amber-800"}`}>{active.testVerified ? "Ready to Send" : "Bulk sending is locked until the test is verified."}</p>
-          <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Final action: Send SMS to {active.queuedCount} Recipients</button>
+          {active.testVerified && active.status !== "scheduled" && <fieldset className="mt-4"><legend className="font-semibold">Delivery time</legend><div className="mt-2 flex flex-wrap gap-3"><label className="rounded-xl border bg-white px-4 py-3"><input className="mr-2" type="radio" checked={deliveryOption === "now"} onChange={() => setDeliveryOption("now")}/>Send now</label><label className="rounded-xl border bg-white px-4 py-3"><input className="mr-2" type="radio" checked={deliveryOption === "schedule"} onChange={() => setDeliveryOption("schedule")} disabled={!schedulingEnabled}/>Schedule later</label></div>{!schedulingEnabled && <p className="mt-2 text-sm text-amber-800">Scheduling becomes available after the secure Cloud Tasks queue and service identity are configured.</p>}</fieldset>}
+          {deliveryOption === "schedule" && (active.status !== "scheduled" || editingSchedule) && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="font-semibold">Date<input type="date" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Time (Africa/Accra)<input type="time" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label></div>}
+          {active.status === "scheduled" && !editingSchedule ? <div className="mt-4 rounded-xl border border-purple-deep bg-white p-4"><strong>Scheduled</strong><p>{active.scheduledAt ? new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(active.scheduledAt)) : "Time unavailable"} (Africa/Accra)</p><p className="text-sm text-text-muted">The final eligible audience will be recalculated before delivery.</p><div className="mt-3 flex gap-2"><button onClick={()=>{setDeliveryOption("schedule"); setEditingSchedule(true);}} className="rounded-xl border px-4 py-2 font-semibold">Change time</button><button onClick={cancelSchedule} className="rounded-xl border border-red-700 px-4 py-2 font-semibold text-red-700">Cancel schedule</button></div></div> : deliveryOption === "schedule" ? <button disabled={busy || !active.testVerified || !canSend || !scheduleDate || !scheduleTime || !schedulingEnabled} onClick={()=>scheduleCampaign(active.scheduledAt ? "reschedule" : "schedule")} className="mt-3 min-h-12 rounded-xl bg-purple-deep px-6 py-3 font-semibold text-white disabled:opacity-50">{active.scheduledAt ? "Save new schedule" : `Schedule SMS to ${active.queuedCount} Recipients`}</button> : <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Final action: Send SMS to {active.queuedCount} Recipients</button>}
         </div>
       </>}
     </section>
@@ -213,7 +240,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       <div className="mt-4 space-y-3">
         {!items.length && <p className="rounded-2xl border bg-white p-5">No previous sends yet.</p>}
         {items.map((campaign) => <article key={campaign.code} className="rounded-2xl border bg-white p-5">
-          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p></div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div>
+          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p>{campaign.scheduledAt && <p className="mt-1 text-sm font-semibold text-purple-deep">Scheduled: {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(campaign.scheduledAt))}</p>}</div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","scheduled","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div>
           {providerMode === "live" && campaign.acceptedCount + campaign.failedCount + campaign.unknownCount > 0 && <button disabled={busy || !canSend} onClick={() => reconcile(campaign)} className="mt-3 rounded-lg border border-purple-deep px-3 py-2 text-sm font-semibold text-purple-deep disabled:opacity-50">Check delivery status</button>}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
             {[["Provider accepted", campaign.acceptedCount], ["Delivered", campaign.deliveredCount], ["Failed", campaign.failedCount], ["Unknown", campaign.unknownCount], ["Delivery rate", `${campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount ? Math.round(campaign.deliveredCount * 100 / (campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount)) : 0}%`]].map(([label, value]) => <div key={String(label)} title={label === "Provider accepted" ? "Arkesel accepted the message; handset delivery is not yet confirmed." : label === "Delivered" ? "Confirmed by Arkesel or the mobile carrier." : label === "Failed" ? "Arkesel or the carrier reported a terminal failure." : label === "Unknown" ? "The outcome cannot safely be determined; the system will not resend automatically." : "Confirmed deliveries divided by accepted, delivered and failed provider outcomes."} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-lg">{value}</strong><small>{label}</small></div>)}

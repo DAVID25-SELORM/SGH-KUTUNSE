@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@google-cloud/tasks", "google-auth-library"],
   poweredByHeader: false,
   async headers() {
     return [

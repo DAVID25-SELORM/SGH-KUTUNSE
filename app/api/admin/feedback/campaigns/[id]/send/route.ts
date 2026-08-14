@@ -11,6 +11,7 @@ import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
 import { getSmsProvider } from "@/lib/server/sms";
+import { verifyScheduledTaskRequest } from "@/lib/server/sms-scheduler";
 
 export const maxDuration = 300;
 
@@ -42,8 +43,9 @@ async function recalculateEligible(ref: FirebaseFirestore.DocumentReference, pur
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
-  const actor = await verifyAdminRequest("feedback_sms");
+  const taskActor = await verifyScheduledTaskRequest(request);
+  if (!taskActor && !isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
+  const actor = taskActor ?? await verifyAdminRequest("feedback_sms");
   if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, campaignSendSchema);
   if (parsed.error) return parsed.error;
@@ -52,6 +54,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const snapshot = await ref.get();
   if (!snapshot.exists) return NextResponse.json({ ok: false }, { status: 404 });
   const campaign = snapshot.data()!;
+  const isScheduled = parsed.data.action === "scheduled";
+  if (isScheduled !== Boolean(taskActor)) return NextResponse.json({ ok: false }, { status: 403 });
+  if (isScheduled) {
+    const scheduledAt = campaign.scheduledAt?.toDate?.();
+    const stale = campaign.status !== "scheduled" || parsed.data.scheduleGeneration !== Number(campaign.scheduleGeneration) || taskActor?.task !== campaign.scheduledTaskName;
+    if (stale) return NextResponse.json({ ok: true, ignored: true, reason: "stale_or_cancelled_schedule" });
+    if (!(scheduledAt instanceof Date) || scheduledAt.getTime() > Date.now() + 60_000) return NextResponse.json({ ok: false, message: "Scheduled campaign is not due." }, { status: 409 });
+  }
   const provider = getSmsProvider();
   if (parsed.data.action === "test") {
     const phone = normalizeGhanaPhone(parsed.data.testPhone ?? "");
@@ -71,7 +81,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   const currentLease = campaign.processingLeaseUntil?.toDate?.();
   const recoveryWindowOpen = campaign.status === "sending" && currentLease instanceof Date && currentLease.getTime() <= Date.now();
-  if (campaign.testVerified !== true || (campaign.status !== "test_verified" && !recoveryWindowOpen))
+  if (campaign.testVerified !== true || (!isScheduled && campaign.status !== "test_verified" && !recoveryWindowOpen))
     return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
   let recalculated;
@@ -79,21 +89,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 }); throw error; }
   const expected = recalculated.eligible.length;
   if (parsed.data.action === "preview") return NextResponse.json({ ok: true, eligibleCount: expected, excludedCount: recalculated.excluded.length });
-  if (parsed.data.confirmation !== `SEND ${expected}`) return NextResponse.json({ ok: false, message: `Type SEND ${expected} to confirm this batch.` }, { status: 400 });
+  if (!isScheduled && parsed.data.confirmation !== `SEND ${expected}`) return NextResponse.json({ ok: false, message: `Type SEND ${expected} to confirm this batch.` }, { status: 400 });
   if (!recalculated.eligible.length) return NextResponse.json({ ok: false, message: "There are no eligible recipients." }, { status: 409 });
   const claimed = await adminDb.runTransaction(async (transaction) => {
     const fresh = await transaction.get(ref);
     const status = String(fresh.data()?.status ?? "");
     const leaseUntil = fresh.data()?.processingLeaseUntil?.toDate?.();
     const recoverable = status === "sending" && leaseUntil instanceof Date && leaseUntil.getTime() <= Date.now();
-    if ((status !== "test_verified" && !recoverable) || fresh.data()?.testVerified !== true) return false;
-    transaction.update(ref, { status: "sending", processingBy: actor.uid, processingLeaseUntil: new Date(Date.now() + 10 * 60 * 1000), bulkApprovedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    const scheduledMatch = isScheduled && status === "scheduled" && fresh.data()?.scheduleGeneration === parsed.data.scheduleGeneration && fresh.data()?.scheduledTaskName === taskActor?.task;
+    if ((!scheduledMatch && status !== "test_verified" && !recoverable) || fresh.data()?.testVerified !== true) return false;
+    transaction.update(ref, { status: "sending", processingBy: actor.uid, processingLeaseUntil: new Date(Date.now() + 10 * 60 * 1000), bulkApprovedAt: FieldValue.serverTimestamp(), finalEligibleCount: expected, excludedSinceScheduling: Math.max(0, Number(fresh.data()?.originalEligibleCount ?? expected) - expected), updatedAt: FieldValue.serverTimestamp() });
     return true;
   });
   if (!claimed) return NextResponse.json({ ok: false, message: "This campaign was already started." }, { status: 409 });
   const ambiguous = await ref.collection("recipients").where("status", "==", "sending").limit(5_000).get();
   for (let offset = 0; offset < ambiguous.size; offset += 450) { const batch = adminDb.batch(); ambiguous.docs.slice(offset, offset + 450).forEach((doc) => batch.update(doc.ref, { status: "interrupted_delivery_unknown", errorClass: "interrupted_delivery_unknown", updatedAt: FieldValue.serverTimestamp() })); await batch.commit(); }
-  await writeAudit(actor.uid, "feedback_campaign.bulk_approved", "feedback_campaign", id, { recipientCount: String(recalculated.eligible.length) });
+  await writeAudit(actor.uid, isScheduled ? "feedback_campaign.scheduled_send_started" : "feedback_campaign.bulk_approved", "feedback_campaign", id, { recipientCount: String(recalculated.eligible.length) });
   const results: SmsResult[] = [];
   for (let offset = 0; offset < recalculated.eligible.length; offset += 200) {
     const chunk = recalculated.eligible.slice(offset, offset + 200);

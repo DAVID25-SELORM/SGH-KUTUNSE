@@ -17,7 +17,13 @@ export const campaignCreateSchema = z.strictObject({
 });
 
 export const recipientImportSchema = z.strictObject({ recipients: z.string().trim().min(1).max(12_000) });
-export const campaignSendSchema = z.strictObject({ action: z.enum(["test", "preview", "batch"]), confirmation: z.string().trim().max(80), testPhone: z.string().trim().max(30).optional() });
+export const campaignSendSchema = z.strictObject({ action: z.enum(["test", "preview", "batch", "scheduled"]), confirmation: z.string().trim().max(80), testPhone: z.string().trim().max(30).optional(), scheduleGeneration: z.number().int().positive().optional() });
+export const campaignScheduleSchema = z.strictObject({
+  action: z.enum(["schedule", "reschedule", "cancel"]),
+  date: z.string().trim().max(10).default(""),
+  time: z.string().trim().max(5).default(""),
+  timezone: z.literal("Africa/Accra").default("Africa/Accra"),
+});
 export const feedbackContactSchema = z.strictObject({
   name: z.string().trim().max(120).optional().default(""),
   phone: z.string().trim().min(10).max(30),
