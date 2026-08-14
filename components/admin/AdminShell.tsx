@@ -71,6 +71,7 @@ const groups: Array<{
         permission: "telemedicine",
       },
       { href: "/admin/feedback", label: "Patient feedback", icon: MessageSquare, permission: "feedback" },
+      { href: "/admin/feedback-contacts", label: "Feedback contacts", icon: Users, permission: "feedback_campaigns" },
     ],
   },
   {

@@ -15,6 +15,11 @@ export const campaignCreateSchema = z.strictObject({
 
 export const recipientImportSchema = z.strictObject({ recipients: z.string().trim().min(1).max(12_000) });
 export const campaignSendSchema = z.strictObject({ action: z.enum(["test", "batch"]), confirmation: z.string().trim().max(80), testPhone: z.string().trim().max(30).optional() });
+export const feedbackContactSchema = z.strictObject({
+  name: z.string().trim().max(120).optional().default(""),
+  phone: z.string().trim().min(10).max(30),
+  source: z.enum(["staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "other"]),
+});
 
 export function parseRecipientImport(value: string) {
   const entries = value.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean);

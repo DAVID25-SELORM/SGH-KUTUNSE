@@ -43,8 +43,17 @@ export async function POST(
       campaign.ref.collection("recipients").limit(5_000).get(),
     ),
   );
+  const contactSnapshot = targetSource === "all_contacts"
+    ? await adminDb.collection("feedback_contacts").limit(5_000).get()
+    : await adminDb.collection("feedback_contacts").where("source", "==", targetSource).limit(5_000).get();
   const uniquePhones = new Map<string, string>();
   let invalid = 0;
+  for (const document of contactSnapshot.docs) {
+    if (document.data().status === "opted_out") continue;
+    const phone = normalizeGhanaPhone(String(document.data().phone ?? ""));
+    if (!phone) { invalid++; continue; }
+    uniquePhones.set(recipientKey(phone), phone);
+  }
   for (const snapshot of sourceSnapshots) {
     for (const document of snapshot.docs) {
       if (document.data().status === "opted_out") continue;
