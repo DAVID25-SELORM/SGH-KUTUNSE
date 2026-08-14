@@ -60,8 +60,13 @@ export function FeedbackForm() {
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const campaign = query.get("campaign") ?? "";
+    const testToken = query.get("t") ?? "";
     const source = query.get("source") ?? "";
     if (/^[A-Za-z0-9_-]{1,80}$/.test(campaign)) setValue("campaign", campaign);
+    if (/^[A-Za-z0-9_-]{32,160}$/.test(testToken)) {
+      setValue("testToken", testToken);
+      void fetch("/api/feedback/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: testToken }) });
+    }
     if (["website", "health_screening", "facility", "qr", "sms"].includes(source)) setValue("source", source as FeedbackFormInput["source"]);
   }, [setValue]);
   const visit = watch("visitType"),
@@ -388,6 +393,7 @@ export function FeedbackForm() {
             records.
           </p>
           <input className="hidden" tabIndex={-1} {...register("website")} />
+          <input className="hidden" tabIndex={-1} {...register("testToken")} />
           {serverError && (
             <p role="alert" className="rounded-xl bg-amber-50 p-3">
               {serverError}

@@ -33,9 +33,10 @@ export function recipientKey(phone: string) {
   return createHash("sha256").update(phone).digest("hex");
 }
 
-export function campaignLink(code: string, source: string) {
+export function campaignLink(code: string, source: string, testToken?: string) {
   const url = new URL("https://www.satellitegeneralhospital.com/feedback");
   url.searchParams.set("campaign", code);
   url.searchParams.set("source", source === "health_screening" ? "health_screening" : "sms");
+  if (testToken) url.searchParams.set("t", testToken);
   return url.toString();
 }

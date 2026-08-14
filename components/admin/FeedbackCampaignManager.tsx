@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { campaignSources, defaultFeedbackMessage } from "@/lib/feedback-campaigns";
 import { AGE_GROUPS } from "@/lib/contacts";
 
@@ -8,6 +8,7 @@ type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
   recipientCount: number; queuedCount: number; mockedCount: number; acceptedCount: number;
   deliveredCount: number; failedCount: number; optedOutCount: number; responseCount: number;
+  testSmsAccepted?: boolean; testLinkOpened?: boolean; testFeedbackSubmitted?: boolean; testVerified?: boolean;
 };
 type Preparation = { added: number; queued: number; duplicateCount: number; invalid: number; optedOut: number };
 
@@ -74,17 +75,38 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     await run(async () => {
       await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "test", testPhone, confirmation: "SEND TEST" });
       setTested(true);
+      setActive((current) => current ? { ...current, status: "test_sent", testSmsAccepted: true } : current);
     }, providerMode === "live" ? "Live test SMS accepted by Arkesel. Check the handset and open the survey link." : providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Mock test passed. No real SMS was sent.");
+  }
+
+  useEffect(() => {
+    if (!active || !tested || active.testVerified) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await request(`/api/admin/feedback/campaigns/${active.code}/status`);
+        setActive((current) => current ? { ...current, ...status } : current);
+      } catch { /* Keep polling; transient network failures must not change verification state. */ }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [active, tested]);
+
+  async function sendBulk() {
+    if (!active?.testVerified) return;
+    if (!window.confirm(`You are about to send this feedback SMS to ${active.queuedCount} eligible contacts. Continue?`)) return;
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "batch", confirmation: `SEND ${active.queuedCount}` });
+      setActive((current) => current ? { ...current, status: String(result.status ?? current.status), failedCount: current.failedCount + Number(result.failed ?? 0), queuedCount: Math.max(0, current.queuedCount - Number(result.processed ?? 0)) } : current);
+    }, "Bulk SMS was submitted to Arkesel. Review the campaign results below.");
   }
 
   function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); }
 
-  const steps = ["Select recipients", "Review message", "Test", "Send"];
-  const currentStep = !active ? 1 : !tested ? 2 : 4;
+  const steps = ["Audience", "Message", "Test", "Send", "Results"];
+  const currentStep = !active ? 1 : !tested ? 2 : !active.testVerified ? 3 : active.status === "completed" ? 5 : 4;
 
   return <div className="mt-6 space-y-8">
     <section className="rounded-2xl border bg-white p-5 sm:p-6">
-      <ol className="grid gap-2 sm:grid-cols-4" aria-label="Send feedback SMS steps">
+      <ol className="grid gap-2 sm:grid-cols-5" aria-label="Send feedback SMS steps">
         {steps.map((step, index) => <li key={step} className={`rounded-xl px-3 py-3 text-sm font-semibold ${currentStep >= index + 1 ? "bg-purple-deep text-white" : "bg-bg-soft text-text-muted"}`}>{index + 1}. {step}</li>)}
       </ol>
 
@@ -136,8 +158,13 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
         <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="text-xl font-semibold">4. Send</h2>
-          <p className="mt-1 text-sm">{tested ? "The test step passed." : "Complete the live handset test and submit one survey response first."} Live bulk sending remains locked during verification.</p>
-          <button disabled className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white opacity-50">Send SMS to {active.queuedCount} Recipients</button>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>{active.testSmsAccepted ? "✅" : "○"} Test SMS sent</li>
+            <li>{active.testLinkOpened ? "✅" : "○"} Survey link opened</li>
+            <li>{active.testFeedbackSubmitted ? "✅" : "○"} Feedback received</li>
+            <li>{active.testVerified ? "✅ Test verified — Bulk SMS is ready" : "○ Waiting for successful test feedback submission"}</li>
+          </ul>
+          <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">Send SMS to {active.queuedCount} Recipients</button>
         </div>
       </>}
     </section>

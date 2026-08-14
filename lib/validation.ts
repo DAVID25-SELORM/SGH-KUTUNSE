@@ -146,6 +146,7 @@ export const feedbackSchema = z
       .regex(/^[A-Za-z0-9_-]{1,80}$/)
       .optional()
       .or(z.literal("")),
+    testToken: z.string().trim().regex(/^[A-Za-z0-9_-]{32,160}$/).optional().or(z.literal("")),
     source: z
       .enum(["website", "health_screening", "facility", "qr", "sms"])
       .default("website"),

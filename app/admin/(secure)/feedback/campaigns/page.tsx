@@ -18,14 +18,16 @@ export default async function Page() {
       mockedCount: Number(data.mockedCount || 0), acceptedCount: Number(data.acceptedCount || 0),
       deliveredCount: Number(data.deliveredCount || 0), failedCount: Number(data.failedCount || 0),
       optedOutCount: Number(data.optedOutCount || 0), responseCount: Number(data.responseCount || 0),
+      testSmsAccepted: Boolean(data.testSmsAcceptedAt), testLinkOpened: Boolean(data.testLinkOpenedAt),
+      testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt), testVerified: data.testVerified === true,
     };
   });
   return <section>
     <p className="text-sm font-semibold text-pink-accent">PATIENT FEEDBACK</p>
     <h1 className="text-3xl font-semibold text-purple-deep">Send Feedback SMS</h1>
-    <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-      <strong>Live bulk sending is safely locked</strong>
-      <p className="mt-2 text-sm">A controlled one-number live test is available. Bulk sending remains unavailable until the handset test and survey response are verified.</p>
+    <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+      <strong>Automatic test verification</strong>
+      <p className="mt-2 text-sm">After the test recipient opens the secure link and submits feedback successfully, bulk sending unlocks automatically.</p>
     </div>
     <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} />
     <div className="mt-8"><FeedbackQr /></div>
