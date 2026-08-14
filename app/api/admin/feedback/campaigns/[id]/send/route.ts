@@ -21,7 +21,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!snapshot.exists) return NextResponse.json({ ok: false }, { status: 404 });
   const campaign = snapshot.data()!;
   const provider = getSmsProvider();
-  if (provider.mode === "live") return NextResponse.json({ ok: false, message: "Live SMS requires a separately approved production release." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
   if (parsed.data.action === "test") {
     const phone = normalizeGhanaPhone(parsed.data.testPhone ?? "");
@@ -30,6 +29,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
     return NextResponse.json({ ok: true, status: result.status, mode: provider.mode });
   }
+  if (provider.mode === "live" && process.env.SMS_BULK_ENABLED !== "true")
+    return NextResponse.json({ ok: false, message: "Live bulk SMS remains locked until the handset test and survey response are verified." }, { status: 409 });
   const recipients = await ref.collection("recipients").where("status", "==", "queued").limit(400).get();
   const expected = Number(campaign.queuedCount ?? recipients.size);
   if (parsed.data.confirmation !== `SEND ${expected}`) return NextResponse.json({ ok: false, message: `Type SEND ${expected} to confirm this batch.` }, { status: 400 });

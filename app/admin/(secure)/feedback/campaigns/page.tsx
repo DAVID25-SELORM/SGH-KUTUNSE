@@ -25,7 +25,7 @@ export default async function Page() {
     <h1 className="text-3xl font-semibold text-purple-deep">Send Feedback SMS</h1>
     <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
       <strong>Live bulk sending is safely locked</strong>
-      <p className="mt-2 text-sm">You can prepare recipients and test the workflow. Live sending remains unavailable until the Arkesel API key is rotated and securely configured.</p>
+      <p className="mt-2 text-sm">A controlled one-number live test is available. Bulk sending remains unavailable until the handset test and survey response are verified.</p>
     </div>
     <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} />
     <div className="mt-8"><FeedbackQr /></div>

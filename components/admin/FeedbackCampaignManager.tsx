@@ -71,7 +71,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     await run(async () => {
       await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "test", testPhone, confirmation: "SEND TEST" });
       setTested(true);
-    }, providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Test passed. No real SMS was sent.");
+    }, providerMode === "live" ? "Live test SMS accepted by Arkesel. Check the handset and open the survey link." : providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Mock test passed. No real SMS was sent.");
   }
 
   function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); }
@@ -123,7 +123,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
         <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="text-xl font-semibold">4. Send</h2>
-          <p className="mt-1 text-sm">{tested ? "The test step passed." : "Complete the test step before sending."} Live bulk sending remains locked until the Arkesel key is rotated and securely configured.</p>
+          <p className="mt-1 text-sm">{tested ? "The test step passed." : "Complete the live handset test and submit one survey response first."} Live bulk sending remains locked during verification.</p>
           <button disabled className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white opacity-50">Send SMS to {active.queuedCount} Recipients</button>
         </div>
       </>}
