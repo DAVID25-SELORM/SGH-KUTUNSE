@@ -13,6 +13,33 @@ import { getSmsProvider } from "@/lib/server/sms";
 
 export const maxDuration = 300;
 
+async function recalculateEligible(ref: FirebaseFirestore.DocumentReference) {
+  const snapshot = await ref.collection("recipients").where("status", "==", "queued").limit(5_001).get();
+  if (snapshot.size > 5_000) throw new Error("AUDIENCE_LIMIT");
+  const eligible: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  const excluded: Array<{ doc: FirebaseFirestore.QueryDocumentSnapshot; status: "invalid" | "opted_out" | "skipped" }> = [];
+  for (let offset = 0; offset < snapshot.size; offset += 400) {
+    const group = snapshot.docs.slice(offset, offset + 400);
+    const [contacts, optOuts] = await Promise.all([
+      adminDb.getAll(...group.map((doc) => adminDb.collection("feedback_contacts").doc(doc.id))),
+      adminDb.getAll(...group.map((doc) => adminDb.collection("sms_opt_outs").doc(doc.id))),
+    ]);
+    group.forEach((doc, index) => {
+      if (!normalizeGhanaPhone(String(doc.data().phone ?? ""))) excluded.push({ doc, status: "invalid" });
+      else if (optOuts[index].exists) excluded.push({ doc, status: "opted_out" });
+      else if (contacts[index].exists && (contacts[index].data()?.status !== "active" || contacts[index].data()?.doNotContact === true || contacts[index].data()?.smsOptIn !== true)) excluded.push({ doc, status: "skipped" });
+      else eligible.push(doc);
+    });
+  }
+  for (let offset = 0; offset < excluded.length; offset += 450) {
+    const batch = adminDb.batch();
+    excluded.slice(offset, offset + 450).forEach(({ doc, status }) => batch.update(doc.ref, { status, exclusionReason: status, updatedAt: FieldValue.serverTimestamp() }));
+    await batch.commit();
+  }
+  await ref.set({ finalEligibleCount: eligible.length, finalExcludedCount: excluded.length, queuedCount: eligible.length, eligibilityCheckedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return { eligible, excluded };
+}
+
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const actor = await verifyAdminRequest("feedback_sms");
@@ -41,35 +68,47 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
     return NextResponse.json({ ok: true, status: result.status, mode: provider.mode });
   }
-  if (campaign.testVerified !== true || campaign.status !== "test_verified")
+  const currentLease = campaign.processingLeaseUntil?.toDate?.();
+  const recoveryWindowOpen = campaign.status === "sending" && currentLease instanceof Date && currentLease.getTime() <= Date.now();
+  if (campaign.testVerified !== true || (campaign.status !== "test_verified" && !recoveryWindowOpen))
     return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
-  const recipients = await ref.collection("recipients").where("status", "==", "queued").limit(5_000).get();
-  const expected = Number(campaign.queuedCount ?? recipients.size);
+  let recalculated;
+  try { recalculated = await recalculateEligible(ref); }
+  catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 }); throw error; }
+  const expected = recalculated.eligible.length;
+  if (parsed.data.action === "preview") return NextResponse.json({ ok: true, eligibleCount: expected, excludedCount: recalculated.excluded.length });
   if (parsed.data.confirmation !== `SEND ${expected}`) return NextResponse.json({ ok: false, message: `Type SEND ${expected} to confirm this batch.` }, { status: 400 });
-  if (recipients.empty) return NextResponse.json({ ok: false, message: "There are no queued recipients." }, { status: 409 });
+  if (!recalculated.eligible.length) return NextResponse.json({ ok: false, message: "There are no eligible recipients." }, { status: 409 });
   const claimed = await adminDb.runTransaction(async (transaction) => {
     const fresh = await transaction.get(ref);
-    if (fresh.data()?.status !== "test_verified" || fresh.data()?.testVerified !== true) return false;
-    transaction.update(ref, { status: "sending", processingBy: actor.uid, bulkApprovedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    const status = String(fresh.data()?.status ?? "");
+    const leaseUntil = fresh.data()?.processingLeaseUntil?.toDate?.();
+    const recoverable = status === "sending" && leaseUntil instanceof Date && leaseUntil.getTime() <= Date.now();
+    if ((status !== "test_verified" && !recoverable) || fresh.data()?.testVerified !== true) return false;
+    transaction.update(ref, { status: "sending", processingBy: actor.uid, processingLeaseUntil: new Date(Date.now() + 10 * 60 * 1000), bulkApprovedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     return true;
   });
   if (!claimed) return NextResponse.json({ ok: false, message: "This campaign was already started." }, { status: 409 });
-  await writeAudit(actor.uid, "feedback_campaign.bulk_approved", "feedback_campaign", id, { recipientCount: String(recipients.size) });
+  const ambiguous = await ref.collection("recipients").where("status", "==", "sending").limit(5_000).get();
+  for (let offset = 0; offset < ambiguous.size; offset += 450) { const batch = adminDb.batch(); ambiguous.docs.slice(offset, offset + 450).forEach((doc) => batch.update(doc.ref, { status: "failed", errorClass: "interrupted_delivery_unknown", updatedAt: FieldValue.serverTimestamp() })); await batch.commit(); }
+  await writeAudit(actor.uid, "feedback_campaign.bulk_approved", "feedback_campaign", id, { recipientCount: String(recalculated.eligible.length) });
   const results: SmsResult[] = [];
-  for (let offset = 0; offset < recipients.size; offset += 200) {
-    const chunk = recipients.docs.slice(offset, offset + 200);
+  for (let offset = 0; offset < recalculated.eligible.length; offset += 200) {
+    const chunk = recalculated.eligible.slice(offset, offset + 200);
+    const claimBatch = adminDb.batch(); chunk.forEach((doc) => claimBatch.update(doc.ref, { status: "sending", attemptCount: FieldValue.increment(1), attemptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })); await claimBatch.commit();
     results.push(...await provider.sendBatch(chunk.map((doc) => ({ to: String(doc.data().phone), message, idempotencyKey: `${id}-${doc.id}` }))));
   }
   const mocked = results.filter((result) => result.status === "mocked").length;
   const failed = results.filter((result) => result.status === "failed").length;
-  for (let offset = 0; offset < recipients.size; offset += 200) {
+  for (let offset = 0; offset < recalculated.eligible.length; offset += 200) {
     const writeBatch = adminDb.batch();
-    recipients.docs.slice(offset, offset + 200).forEach((doc, index) => { const result = results[offset + index]; writeBatch.update(doc.ref, { status: result.status, providerId: result.providerId, attemptCount: FieldValue.increment(1), attemptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }); if (result.status !== "failed") writeBatch.set(adminDb.collection("feedback_contacts").doc(doc.id), { lastContactedAt: FieldValue.serverTimestamp(), lastCampaignId: id, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); });
+    recalculated.eligible.slice(offset, offset + 200).forEach((doc, index) => { const result = results[offset + index]; const status = result.status === "accepted" ? "sent" : result.status; writeBatch.update(doc.ref, { status, providerId: result.providerId, providerStatus: result.status, updatedAt: FieldValue.serverTimestamp() }); if (result.status !== "failed") writeBatch.set(adminDb.collection("feedback_contacts").doc(doc.id), { lastContactedAt: FieldValue.serverTimestamp(), lastCampaignId: id, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); });
     await writeBatch.commit();
   }
-  const finalStatus = failed === results.length ? "failed" : failed ? "partially_failed" : "completed";
-  await ref.update({ status: finalStatus, mockedCount: FieldValue.increment(mocked), acceptedCount: FieldValue.increment(results.length - failed - mocked), failedCount: FieldValue.increment(failed), queuedCount: FieldValue.increment(-results.length), sentAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-  await writeAudit(actor.uid, "feedback_campaign.bulk_sent", "feedback_campaign", id, { recipientCount: String(results.length), failedCount: String(failed), providerMode: provider.mode });
-  return NextResponse.json({ ok: true, processed: results.length, failed, status: finalStatus, mode: provider.mode });
+  const totalFailed = failed + ambiguous.size;
+  const finalStatus = totalFailed === results.length + ambiguous.size ? "failed" : totalFailed ? "partially_failed" : "completed";
+  await ref.update({ status: finalStatus, mockedCount: FieldValue.increment(mocked), acceptedCount: FieldValue.increment(results.length - failed - mocked), failedCount: FieldValue.increment(totalFailed), queuedCount: 0, processingLeaseUntil: null, sentAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+  await writeAudit(actor.uid, "feedback_campaign.bulk_sent", "feedback_campaign", id, { recipientCount: String(results.length), failedCount: String(totalFailed), providerMode: provider.mode });
+  return NextResponse.json({ ok: true, processed: results.length, failed: totalFailed, status: finalStatus, mode: provider.mode });
 }

@@ -54,6 +54,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const imported = parseRecipientImport(parsed.data.recipients);
   if (!imported.recipients.length) return NextResponse.json({ ok: false, message: "No valid Ghana phone numbers were found." }, { status: 400 });
   if (imported.recipients.length > 400) return NextResponse.json({ ok: false, message: "Import no more than 400 unique recipients at a time." }, { status: 413 });
+  if (Number(campaign.data()?.recipientCount ?? 0) + imported.recipients.length > 5_000) return NextResponse.json({ ok: false, message: "This import could exceed the 5,000-recipient campaign limit." }, { status: 413 });
   const refs = imported.recipients.map((phone) => campaignRef.collection("recipients").doc(recipientKey(phone)));
   const [existing, optOuts] = await Promise.all([adminDb.getAll(...refs), adminDb.getAll(...imported.recipients.map((phone) => adminDb.collection("sms_opt_outs").doc(recipientKey(phone))))]);
   const batch = adminDb.batch();

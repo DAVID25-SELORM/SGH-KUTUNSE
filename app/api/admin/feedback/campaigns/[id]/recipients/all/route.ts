@@ -41,8 +41,8 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "Recipients cannot be changed after processing starts." }, { status: 409 });
 
   const contactSnapshot = targetSource === "all_contacts"
-    ? await adminDb.collection("feedback_contacts").limit(5_000).get()
-    : await adminDb.collection("feedback_contacts").where("source", "==", targetSource).limit(5_000).get();
+    ? await adminDb.collection("feedback_contacts").limit(5_001).get()
+    : await adminDb.collection("feedback_contacts").where("source", "==", targetSource).limit(5_001).get();
   const uniquePhones = new Map<string, string>();
   let invalid = 0;
   for (const document of contactSnapshot.docs) {
@@ -51,6 +51,8 @@ export async function POST(
     if (!phone) { invalid++; continue; }
     uniquePhones.set(recipientKey(phone), phone);
   }
+  if (uniquePhones.size > 5_000)
+    return NextResponse.json({ ok: false, message: "This audience exceeds the 5,000-recipient campaign limit. Apply narrower filters." }, { status: 413 });
   if (!uniquePhones.size)
     return NextResponse.json({ ok: false, message: "No eligible source contacts were found." }, { status: 409 });
 

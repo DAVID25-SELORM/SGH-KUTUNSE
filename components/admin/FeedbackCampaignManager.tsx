@@ -80,7 +80,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   }
 
   useEffect(() => {
-    if (!active || !tested || active.testVerified) return;
+    if (!active || !tested || (active.testVerified && active.status !== "sending")) return;
     const timer = window.setInterval(async () => {
       try {
         const status = await request(`/api/admin/feedback/campaigns/${active.code}/status`);
@@ -92,11 +92,20 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
   async function sendBulk() {
     if (!active?.testVerified) return;
-    if (!window.confirm(`You are about to send this feedback SMS to ${active.queuedCount} eligible contacts. Continue?`)) return;
     await run(async () => {
-      const result = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "batch", confirmation: `SEND ${active.queuedCount}` });
+      const preview = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "preview", confirmation: "" });
+      const finalCount = Number(preview.eligibleCount ?? 0);
+      setActive((current) => current ? { ...current, queuedCount: finalCount } : current);
+      if (!finalCount) throw new Error("No eligible recipients remain after the final safety check.");
+      if (!window.confirm(`You are about to send this feedback SMS to ${finalCount} eligible contacts. Continue?`)) return;
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "batch", confirmation: `SEND ${finalCount}` });
       setActive((current) => current ? { ...current, status: String(result.status ?? current.status), failedCount: current.failedCount + Number(result.failed ?? 0), queuedCount: Math.max(0, current.queuedCount - Number(result.processed ?? 0)) } : current);
-    }, "Bulk SMS was submitted to Arkesel. Review the campaign results below.");
+      setNotice(result.status === "partially_failed" ? `Bulk sending completed with ${result.failed} failed or uncertain deliveries. Review the results before follow-up.` : result.status === "failed" ? "Bulk sending failed. No recipient has been marked delivered." : "Bulk SMS was accepted by Arkesel. Delivery is shown separately when confirmed by the provider.");
+    });
+  }
+
+  function resumeCampaign(campaign: Campaign) {
+    setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice("");
   }
 
   function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); }
@@ -152,7 +161,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         <div className="mt-7">
           <h2 className="text-xl font-semibold">3. Test</h2>
           <p className="mt-1 text-sm text-text-muted">Confirm the message workflow using one authorised Ghana number.</p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Test phone number" className="min-h-11 rounded-xl border p-3 sm:w-80" /><button disabled={busy || !canSend || !testPhone.trim()} onClick={sendTest} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">Send Test SMS</button></div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Test phone number" className="min-h-11 rounded-xl border p-3 sm:w-80" /><button disabled={busy || !canSend || !testPhone.trim() || active.testSmsAccepted} onClick={sendTest} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">{active.testVerified ? "Test Verified" : active.testSmsAccepted ? "Test SMS Sent" : "Send Test SMS"}</button></div>
           {!canSend && <p className="mt-2 text-sm text-red-700">Your administrator role does not have permission to test or send SMS.</p>}
         </div>
 
@@ -164,7 +173,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
             <li>{active.testFeedbackSubmitted ? "✅" : "○"} Feedback received</li>
             <li>{active.testVerified ? "✅ Test verified — Bulk SMS is ready" : "○ Waiting for successful test feedback submission"}</li>
           </ul>
-          <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">Send SMS to {active.queuedCount} Recipients</button>
+          <p className={`mt-4 font-semibold ${active.testVerified ? "text-emerald-800" : "text-amber-800"}`}>{active.testVerified ? "Ready to Send" : "Bulk sending is locked until the test is verified."}</p>
+          <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Final action: Send SMS to {active.queuedCount} Recipients</button>
         </div>
       </>}
     </section>
@@ -177,7 +187,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       <div className="mt-4 space-y-3">
         {!items.length && <p className="rounded-2xl border bg-white p-5">No previous sends yet.</p>}
         {items.map((campaign) => <article key={campaign.code} className="rounded-2xl border bg-white p-5">
-          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p></div><span className="text-sm text-text-muted">{campaign.code}</span></div>
+          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p></div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div>
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {[["Total", campaign.recipientCount], ["Queued", campaign.queuedCount], ["Sent", campaign.acceptedCount + campaign.mockedCount + campaign.deliveredCount], ["Delivered", campaign.deliveredCount], ["Failed", campaign.failedCount], ["Opted out", campaign.optedOutCount]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-2 text-center"><strong className="block">{value}</strong><small>{label}</small></div>)}
           </div>
