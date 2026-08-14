@@ -10,6 +10,7 @@ export interface SmsProvider {
     idempotencyKey: string,
   ): Promise<SmsResult>;
   sendBatch(messages: Array<{ to: string; message: string; idempotencyKey: string }>): Promise<SmsResult[]>;
+  getDeliveryReports?(providerIds: string[]): Promise<Array<{ providerId: string; status: string }>>;
   getDeliveryStatus?(providerId: string): Promise<SmsResult>;
   processDeliveryWebhook?(payload: unknown): Promise<void>;
 }

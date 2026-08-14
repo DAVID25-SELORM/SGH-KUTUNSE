@@ -6,6 +6,8 @@ type ArkeselResponse = {
   data?: Array<{ recipient?: string; id?: string }>;
 };
 
+export type ArkeselDeliveryReport = { providerId: string; status: string };
+
 export class ArkeselSmsProvider implements SmsProvider {
   mode: "sandbox" | "live";
 
@@ -34,24 +36,25 @@ export class ArkeselSmsProvider implements SmsProvider {
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {
-        return recipients.map((recipient) => ({
-          providerId: `arkesel-failed-${recipient.slice(-4)}`,
+        return recipients.map(() => ({
+          providerId: "",
           status: "failed" as const,
         }));
       }
       const payload = (await response.json()) as ArkeselResponse;
+      if (payload.status !== "success") throw new Error("Arkesel rejected the request.");
       const byRecipient = new Map(
         (payload.data ?? []).map((item) => [item.recipient?.replace(/^\+/, ""), item.id]),
       );
-      return recipients.map((recipient) => ({
-        providerId:
-          byRecipient.get(recipient.replace(/^\+/, "")) ??
-          `arkesel-${crypto.randomUUID()}`,
-        status: this.mode === "sandbox" ? ("mocked" as const) : ("accepted" as const),
-      }));
+      return recipients.map((recipient) => {
+        const providerId = byRecipient.get(recipient.replace(/^\+/, ""));
+        return providerId
+          ? { providerId, status: this.mode === "sandbox" ? ("mocked" as const) : ("accepted" as const) }
+          : { providerId: "", status: "failed" as const };
+      });
     } catch {
-      return recipients.map((recipient) => ({
-        providerId: `arkesel-failed-${recipient.slice(-4)}`,
+      return recipients.map(() => ({
+        providerId: "",
         status: "failed" as const,
       }));
     }
@@ -71,6 +74,21 @@ export class ArkeselSmsProvider implements SmsProvider {
       messages.map((item) => item.to),
       messages[0].message,
     );
+  }
+
+  async getDeliveryReports(providerIds: string[]): Promise<ArkeselDeliveryReport[]> {
+    if (this.mode !== "live" || !providerIds.length) return [];
+    const response = await fetch("https://sms.arkesel.com/api/v2/sms/message-reports", {
+      method: "POST",
+      headers: { "api-key": this.apiKey.trim(), "Content-Type": "application/json" },
+      body: JSON.stringify({ msg_ids: providerIds }),
+      signal: AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Arkesel report lookup failed (${response.status}).`);
+    const payload = await response.json() as { status?: string; data?: Record<string, { status?: string }> };
+    if (payload.status !== "success" || !payload.data) throw new Error("Arkesel returned an invalid report response.");
+    return Object.entries(payload.data).flatMap(([providerId, report]) => report?.status ? [{ providerId, status: report.status }] : []);
   }
 }
 

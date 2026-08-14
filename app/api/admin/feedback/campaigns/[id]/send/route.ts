@@ -91,7 +91,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   });
   if (!claimed) return NextResponse.json({ ok: false, message: "This campaign was already started." }, { status: 409 });
   const ambiguous = await ref.collection("recipients").where("status", "==", "sending").limit(5_000).get();
-  for (let offset = 0; offset < ambiguous.size; offset += 450) { const batch = adminDb.batch(); ambiguous.docs.slice(offset, offset + 450).forEach((doc) => batch.update(doc.ref, { status: "failed", errorClass: "interrupted_delivery_unknown", updatedAt: FieldValue.serverTimestamp() })); await batch.commit(); }
+  for (let offset = 0; offset < ambiguous.size; offset += 450) { const batch = adminDb.batch(); ambiguous.docs.slice(offset, offset + 450).forEach((doc) => batch.update(doc.ref, { status: "interrupted_delivery_unknown", errorClass: "interrupted_delivery_unknown", updatedAt: FieldValue.serverTimestamp() })); await batch.commit(); }
   await writeAudit(actor.uid, "feedback_campaign.bulk_approved", "feedback_campaign", id, { recipientCount: String(recalculated.eligible.length) });
   const results: SmsResult[] = [];
   for (let offset = 0; offset < recalculated.eligible.length; offset += 200) {
@@ -106,9 +106,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     recalculated.eligible.slice(offset, offset + 200).forEach((doc, index) => { const result = results[offset + index]; const status = result.status === "accepted" ? "sent" : result.status; writeBatch.update(doc.ref, { status, providerId: result.providerId, providerStatus: result.status, updatedAt: FieldValue.serverTimestamp() }); if (result.status !== "failed") writeBatch.set(adminDb.collection("feedback_contacts").doc(doc.id), { lastContactedAt: FieldValue.serverTimestamp(), lastCampaignId: id, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); });
     await writeBatch.commit();
   }
-  const totalFailed = failed + ambiguous.size;
-  const finalStatus = totalFailed === results.length + ambiguous.size ? "failed" : totalFailed ? "partially_failed" : "completed";
-  await ref.update({ status: finalStatus, mockedCount: FieldValue.increment(mocked), acceptedCount: FieldValue.increment(results.length - failed - mocked), failedCount: FieldValue.increment(totalFailed), queuedCount: 0, processingLeaseUntil: null, sentAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-  await writeAudit(actor.uid, "feedback_campaign.bulk_sent", "feedback_campaign", id, { recipientCount: String(results.length), failedCount: String(totalFailed), providerMode: provider.mode });
-  return NextResponse.json({ ok: true, processed: results.length, failed: totalFailed, status: finalStatus, mode: provider.mode });
+  const finalStatus = failed === results.length && !ambiguous.size ? "failed" : failed || ambiguous.size ? "partially_failed" : "completed";
+  await ref.update({ status: finalStatus, mockedCount: FieldValue.increment(mocked), acceptedCount: FieldValue.increment(results.length - failed - mocked), failedCount: FieldValue.increment(failed), unknownCount: FieldValue.increment(ambiguous.size), queuedCount: 0, processingLeaseUntil: null, sentAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+  await writeAudit(actor.uid, "feedback_campaign.bulk_sent", "feedback_campaign", id, { recipientCount: String(results.length), failedCount: String(failed), unknownCount: String(ambiguous.size), providerMode: provider.mode });
+  return NextResponse.json({ ok: true, processed: results.length, failed, unknown: ambiguous.size, status: finalStatus, mode: provider.mode });
 }

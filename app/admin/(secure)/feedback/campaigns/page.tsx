@@ -17,6 +17,7 @@ export default async function Page() {
       recipientCount: Number(data.recipientCount || 0), queuedCount: Number(data.queuedCount || 0),
       mockedCount: Number(data.mockedCount || 0), acceptedCount: Number(data.acceptedCount || 0),
       deliveredCount: Number(data.deliveredCount || 0), failedCount: Number(data.failedCount || 0),
+      unknownCount: Number(data.unknownCount || 0),
       optedOutCount: Number(data.optedOutCount || 0), responseCount: Number(data.responseCount || 0),
       testSmsAccepted: Boolean(data.testSmsAcceptedAt), testLinkOpened: Boolean(data.testLinkOpenedAt),
       testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt), testVerified: data.testVerified === true,

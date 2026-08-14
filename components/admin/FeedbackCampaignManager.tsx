@@ -7,7 +7,7 @@ import { AGE_GROUPS } from "@/lib/contacts";
 type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
   recipientCount: number; queuedCount: number; mockedCount: number; acceptedCount: number;
-  deliveredCount: number; failedCount: number; optedOutCount: number; responseCount: number;
+  deliveredCount: number; failedCount: number; unknownCount: number; optedOutCount: number; responseCount: number;
   testSmsAccepted?: boolean; testLinkOpened?: boolean; testFeedbackSubmitted?: boolean; testVerified?: boolean;
 };
 type Preparation = { added: number; queued: number; duplicateCount: number; invalid: number; optedOut: number };
@@ -54,7 +54,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       const name = `${labels[source]} feedback - ${new Date().toLocaleDateString("en-GB")}`;
       const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10);
       const created = await request("/api/admin/feedback/campaigns", { name, source, message, audience: { gender, ageGroups, source, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), smsConsent: true, hasPhone: true, excludeContactedSince } });
-      const campaign: Campaign = { code: created.code, name, source, message, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, optedOutCount: 0, responseCount: 0 };
+      const campaign: Campaign = { code: created.code, name, source, message, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, unknownCount: 0, optedOutCount: 0, responseCount: 0 };
       const prepared = source === "custom_list"
         ? await request(`/api/admin/feedback/campaigns/${created.code}/recipients`, { recipients: customContacts })
         : await request(`/api/admin/feedback/campaigns/${created.code}/recipients/all`, {});
@@ -106,6 +106,16 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
   function resumeCampaign(campaign: Campaign) {
     setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice("");
+  }
+
+  async function reconcile(campaign: Campaign) {
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${campaign.code}/reconcile`, {});
+      const refreshed = await request(`/api/admin/feedback/campaigns/${campaign.code}/status`);
+      setItems((old) => old.map((item) => item.code === campaign.code ? { ...item, ...refreshed } : item));
+      setActive((current) => current?.code === campaign.code ? { ...current, ...refreshed } : current);
+      setNotice(`Delivery status checked: ${result.updated} recipient status${result.updated === 1 ? "" : "es"} updated.`);
+    });
   }
 
   function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); }
@@ -188,9 +198,11 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         {!items.length && <p className="rounded-2xl border bg-white p-5">No previous sends yet.</p>}
         {items.map((campaign) => <article key={campaign.code} className="rounded-2xl border bg-white p-5">
           <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p></div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div>
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {[["Total", campaign.recipientCount], ["Queued", campaign.queuedCount], ["Sent", campaign.acceptedCount + campaign.mockedCount + campaign.deliveredCount], ["Delivered", campaign.deliveredCount], ["Failed", campaign.failedCount], ["Opted out", campaign.optedOutCount]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-2 text-center"><strong className="block">{value}</strong><small>{label}</small></div>)}
+          {providerMode === "live" && campaign.acceptedCount + campaign.failedCount + campaign.unknownCount > 0 && <button disabled={busy || !canSend} onClick={() => reconcile(campaign)} className="mt-3 rounded-lg border border-purple-deep px-3 py-2 text-sm font-semibold text-purple-deep disabled:opacity-50">Check delivery status</button>}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {[["Provider accepted", campaign.acceptedCount], ["Delivered", campaign.deliveredCount], ["Failed", campaign.failedCount], ["Unknown", campaign.unknownCount], ["Delivery rate", `${campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount ? Math.round(campaign.deliveredCount * 100 / (campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount)) : 0}%`]].map(([label, value]) => <div key={String(label)} title={label === "Provider accepted" ? "Arkesel accepted the message; handset delivery is not yet confirmed." : label === "Delivered" ? "Confirmed by Arkesel or the mobile carrier." : label === "Failed" ? "Arkesel or the carrier reported a terminal failure." : label === "Unknown" ? "The outcome cannot safely be determined; the system will not resend automatically." : "Confirmed deliveries divided by accepted, delivered and failed provider outcomes."} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-lg">{value}</strong><small>{label}</small></div>)}
           </div>
+          <p className="mt-3 text-xs text-text-muted">Sent means provider accepted. Delivered requires Arkesel/carrier confirmation. Unknown messages are not automatically retried.</p>
         </article>)}
       </div>
     </section>
