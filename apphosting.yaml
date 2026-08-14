@@ -59,12 +59,12 @@ env:
     availability:
       - RUNTIME
   - variable: SMS_SCHEDULING_ENABLED
-    value: "false"
+    value: "true"
     availability:
       - BUILD
       - RUNTIME
   - variable: APP_BASE_URL
-    value: https://www.satellitegeneralhospital.com
+    value: https://satellitegeneralhospital.com
     availability:
       - RUNTIME
   - variable: SMS_TASK_LOCATION
