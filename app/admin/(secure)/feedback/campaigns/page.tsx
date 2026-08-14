@@ -24,7 +24,7 @@ export default async function Page() {
       testSmsAccepted: Boolean(data.testSmsAcceptedAt), testLinkOpened: Boolean(data.testLinkOpenedAt),
       testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt), testVerified: data.testVerified === true,
       audience: data.audience && typeof data.audience === "object" ? data.audience : undefined,
-      scheduledAt: data.scheduledAt?.toDate?.()?.toISOString?.(), scheduledTimezone: String(data.scheduledTimezone || ""), originalEligibleCount: Number(data.originalEligibleCount || 0),
+      scheduledAt: data.scheduledAt?.toDate?.()?.toISOString?.(), scheduledTimezone: String(data.scheduledTimezone || ""), scheduledByName: String(data.scheduledByName || ""), originalEligibleCount: Number(data.originalEligibleCount || 0),
     };
   });
   return <section>

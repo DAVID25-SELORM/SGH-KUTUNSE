@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { campaignLink, campaignSendSchema } from "@/lib/feedback-campaigns";
+import { campaignAudienceSchema, campaignLink, campaignSendSchema } from "@/lib/feedback-campaigns";
 import { hasSmsConsentForPurpose, type SmsConsentScope } from "@/lib/contacts";
 import { normalizeGhanaPhone } from "@/lib/sms";
 import type { SmsResult } from "@/lib/sms";
@@ -12,10 +12,11 @@ import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
 import { getSmsProvider } from "@/lib/server/sms";
 import { verifyScheduledTaskRequest } from "@/lib/server/sms-scheduler";
+import { loadCampaignAudience } from "@/lib/server/campaign-audience";
 
 export const maxDuration = 300;
 
-async function recalculateEligible(ref: FirebaseFirestore.DocumentReference, purpose: SmsConsentScope) {
+async function recalculateEligible(ref: FirebaseFirestore.DocumentReference, purpose: SmsConsentScope, allowedContactIds?: Set<string>) {
   const snapshot = await ref.collection("recipients").where("status", "==", "queued").limit(5_001).get();
   if (snapshot.size > 5_000) throw new Error("AUDIENCE_LIMIT");
   const eligible: FirebaseFirestore.QueryDocumentSnapshot[] = [];
@@ -27,7 +28,8 @@ async function recalculateEligible(ref: FirebaseFirestore.DocumentReference, pur
       adminDb.getAll(...group.map((doc) => adminDb.collection("sms_opt_outs").doc(doc.id))),
     ]);
     group.forEach((doc, index) => {
-      if (!normalizeGhanaPhone(String(doc.data().phone ?? ""))) excluded.push({ doc, status: "invalid" });
+      if (allowedContactIds && !allowedContactIds.has(doc.id)) excluded.push({ doc, status: "skipped" });
+      else if (!normalizeGhanaPhone(String(doc.data().phone ?? ""))) excluded.push({ doc, status: "invalid" });
       else if (optOuts[index].exists) excluded.push({ doc, status: "opted_out" });
       else if (contacts[index].exists && (contacts[index].data()?.status !== "active" || contacts[index].data()?.doNotContact === true || !hasSmsConsentForPurpose(contacts[index].data()!, purpose))) excluded.push({ doc, status: "skipped" });
       else eligible.push(doc);
@@ -85,12 +87,34 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
   const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
   let recalculated;
-  try { recalculated = await recalculateEligible(ref, String(campaign.audience?.purpose ?? "feedback_request") as SmsConsentScope); }
-  catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 }); throw error; }
+  try {
+    let allowedContactIds: Set<string> | undefined;
+    if (campaign.source !== "custom_list") {
+      const audience = campaignAudienceSchema.parse(campaign.audience);
+      const currentAudience = await loadCampaignAudience(audience);
+      allowedContactIds = new Set(currentAudience.eligibleContacts.map(contact => contact.id));
+    }
+    recalculated = await recalculateEligible(ref, String(campaign.audience?.purpose ?? "feedback_request") as SmsConsentScope, allowedContactIds);
+  } catch (error) {
+    if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 });
+    if (isScheduled) {
+      await ref.update({ status: "failed", scheduledSendFailedAt: FieldValue.serverTimestamp(), scheduledSendError: "pre_send_validation_failed", updatedAt: FieldValue.serverTimestamp() });
+      await writeAudit(actor.uid, "feedback_campaign.scheduled_send_failed", "feedback_campaign", id, { errorClass: "pre_send_validation_failed" });
+      return NextResponse.json({ ok: false, message: "Scheduled send could not start." }, { status: 500 });
+    }
+    throw error;
+  }
   const expected = recalculated.eligible.length;
   if (parsed.data.action === "preview") return NextResponse.json({ ok: true, eligibleCount: expected, excludedCount: recalculated.excluded.length });
   if (!isScheduled && parsed.data.confirmation !== `SEND ${expected}`) return NextResponse.json({ ok: false, message: `Type SEND ${expected} to confirm this batch.` }, { status: 400 });
-  if (!recalculated.eligible.length) return NextResponse.json({ ok: false, message: "There are no eligible recipients." }, { status: 409 });
+  if (!recalculated.eligible.length) {
+    if (isScheduled) {
+      await ref.update({ status: "failed", finalEligibleCount: 0, excludedSinceScheduling: Number(campaign.originalEligibleCount ?? 0), scheduledSendFailedAt: FieldValue.serverTimestamp(), scheduledSendError: "no_eligible_recipients", updatedAt: FieldValue.serverTimestamp() });
+      await writeAudit(actor.uid, "feedback_campaign.scheduled_send_failed", "feedback_campaign", id, { errorClass: "no_eligible_recipients" });
+      return NextResponse.json({ ok: true, status: "failed", message: "Scheduled send could not start because no eligible recipients remain." });
+    }
+    return NextResponse.json({ ok: false, message: "There are no eligible recipients." }, { status: 409 });
+  }
   const claimed = await adminDb.runTransaction(async (transaction) => {
     const fresh = await transaction.get(ref);
     const status = String(fresh.data()?.status ?? "");

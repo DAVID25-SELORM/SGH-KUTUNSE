@@ -42,7 +42,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const oldTask = String(campaign.scheduledTaskName ?? "");
   const name = await createScheduledSmsTask(id, generation, validation.value);
   try {
-    await ref.update({ status: "scheduled", scheduleGeneration: generation, scheduledAt: Timestamp.fromDate(validation.value), scheduledTimezone: "Africa/Accra", scheduledBy: actor.uid, scheduledTaskName: name, originalEligibleCount: summary.eligible, scheduleUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await ref.update({ status: "scheduled", scheduleGeneration: generation, scheduledAt: Timestamp.fromDate(validation.value), scheduledTimezone: "Africa/Accra", scheduledBy: actor.uid, scheduledByName: String(actor.name || actor.email || "Administrator"), scheduledTaskName: name, originalEligibleCount: summary.eligible, ...(campaign.scheduleCreatedAt ? {} : { scheduleCreatedAt: FieldValue.serverTimestamp() }), scheduleUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
   } catch (error) { await deleteScheduledSmsTask(name); throw error; }
   if (oldTask && oldTask !== name) await deleteScheduledSmsTask(oldTask);
   const event = parsed.data.action === "reschedule" || campaign.status === "scheduled" ? "feedback_campaign.rescheduled" : "feedback_campaign.scheduled";
