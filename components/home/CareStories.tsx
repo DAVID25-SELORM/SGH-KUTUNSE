@@ -1,4 +1,4 @@
-import { ArrowRight, Baby, FlaskConical, HeartPulse, Video } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
@@ -11,10 +11,8 @@ const stories = [
       "Start with a consultation, access on-site diagnostics and collect prescribed medication without navigating care alone. Our services are designed to support a clearer patient journey under one roof.",
     href: "/services",
     cta: "Explore our services",
-    icon: HeartPulse,
-    supportingIcon: FlaskConical,
-    panelTitle: "Connected care",
-    panelCopy: "Consultation. Diagnostics. Treatment. Follow-up.",
+    image: "/images/telemedicine/connected-care.png",
+    imageAlt: "Connected care through consultation, diagnostics, treatment and follow-up",
   },
   {
     eyebrow: "Care Beyond the Hospital",
@@ -23,10 +21,8 @@ const stories = [
       "Request an online consultation when travelling to the hospital is not convenient. The hospital confirms availability before sharing the next steps for your consultation.",
     href: "/telemedicine",
     cta: "Request online consultation",
-    icon: Video,
-    supportingIcon: Baby,
-    panelTitle: "Online consultations",
-    panelCopy: "A simple request. A confirmed time. Professional care.",
+    image: "/images/telemedicine/online-consultations.jpeg",
+    imageAlt: "Online consultation and connected care service",
   },
 ];
 
@@ -34,7 +30,7 @@ export function CareStories() {
   return (
     <section className="overflow-hidden py-24 sm:py-32">
       <Container className="space-y-24 sm:space-y-32">
-        {stories.map(({ eyebrow, title, description, href, cta, icon: Icon, supportingIcon: SupportingIcon, panelTitle, panelCopy }, index) => (
+        {stories.map(({ eyebrow, title, description, href, cta, image, imageAlt }, index) => (
           <article key={title} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-20">
             <div className={index % 2 ? "lg:order-2" : undefined}>
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-deep">{eyebrow}</span>
@@ -48,33 +44,15 @@ export function CareStories() {
               </Button>
             </div>
 
-            {index === 0 ? (
-              <div className="relative min-h-[360px] overflow-hidden rounded-3xl bg-bg-soft sm:min-h-[480px] sm:rounded-[32px] lg:min-h-[540px]">
-                <Image
-                  src="/images/telemedicine/connected-care.jpeg"
-                  alt="Connected care from consultation and diagnostics through treatment and follow-up"
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                />
-              </div>
-            ) : <div
-              className={`group relative min-h-[360px] overflow-hidden rounded-3xl p-6 sm:min-h-[480px] sm:rounded-[32px] sm:p-10 lg:min-h-[540px] lg:p-12 ${
-                index % 2 ? "bg-purple-dark text-white lg:order-1" : "bg-bg-soft text-text-dark"
-              }`}
-            >
-              <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-pink-accent/15 blur-3xl transition-transform duration-700 group-hover:scale-125" />
-              <div className="relative flex h-full min-h-[312px] flex-col justify-between sm:min-h-[400px] lg:min-h-[444px]">
-                <span className={`flex h-16 w-16 items-center justify-center rounded-3xl ${index % 2 ? "bg-white/10" : "bg-white text-purple-deep shadow-sm"}`}>
-                  <Icon className="h-8 w-8" aria-hidden="true" />
-                </span>
-                <div>
-                  <SupportingIcon className={`mb-6 h-24 w-24 transition-transform duration-700 group-hover:scale-110 ${index % 2 ? "text-white/10" : "text-purple-deep/10"}`} aria-hidden="true" />
-                  <p className="text-3xl font-semibold tracking-tight sm:text-4xl">{panelTitle}</p>
-                  <p className={`mt-3 max-w-sm text-base leading-relaxed ${index % 2 ? "text-white/70" : "text-text-body"}`}>{panelCopy}</p>
-                </div>
-              </div>
-            </div>}
+            <div className={`relative min-h-[360px] overflow-hidden rounded-3xl bg-bg-soft sm:min-h-[480px] sm:rounded-[32px] lg:min-h-[540px] ${index % 2 ? "lg:order-1" : ""}`}>
+              <Image
+                src={image}
+                alt={imageAlt}
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
+              />
+            </div>
           </article>
         ))}
       </Container>
