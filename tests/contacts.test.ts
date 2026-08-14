@@ -1,0 +1,11 @@
+import { describe, expect, it } from "vitest";
+import { ageGroupFor, contactMatchesAudience, contactSchema, deriveAge, prepareContact } from "@/lib/contacts";
+
+describe("contact management", () => {
+  it("derives safe age groups", () => { expect(deriveAge("2000-08-14", new Date("2026-08-14T12:00:00Z"))).toBe(26); expect(ageGroupFor(17)).toBe("under_18"); expect(ageGroupFor(25)).toBe("25_34"); expect(ageGroupFor(66)).toBe("65_plus"); });
+  it("normalizes Ghana phones without fabricating demographics", () => { const parsed=contactSchema.parse({phone:"024 123 4567",source:"staff"}); const contact=prepareContact(parsed); expect(contact.normalizedPhone).toBe("+233241234567"); expect(contact.gender).toBe(""); expect(contact.age).toBeNull(); });
+  it("matches female health screening contacts aged 25-44", () => { const contact={status:"active",doNotContact:false,smsOptIn:true,phone:"+233241234567",gender:"female",ageGroup:"25_34",source:"health_screening",sources:["health_screening"],facility:"Kutunse Screening - Aug 2026",tags:["outreach"]}; expect(contactMatchesAudience(contact,{gender:"female",ageGroups:["25_34","35_44"],source:"health_screening",facility:"Kutunse Screening - Aug 2026",tags:["outreach"],smsConsent:true,hasPhone:true})).toBe(true); });
+  it("matches consented contacts aged 55+", () => { expect(contactMatchesAudience({status:"active",doNotContact:false,smsOptIn:true,phone:"+233241234567",ageGroup:"65_plus"},{ageGroups:["55_64","65_plus"],smsConsent:true,hasPhone:true})).toBe(true); });
+  it("always excludes archived, opted-out and do-not-contact records", () => { const f={smsConsent:true,hasPhone:true}; expect(contactMatchesAudience({status:"archived",smsOptIn:true,phone:"+233241234567"},f)).toBe(false); expect(contactMatchesAudience({status:"active",smsOptIn:false,phone:"+233241234567"},f)).toBe(false); expect(contactMatchesAudience({status:"active",smsOptIn:true,doNotContact:true,phone:"+233241234567"},f)).toBe(false); });
+  it("excludes recently contacted recipients", () => { const contact={status:"active",smsOptIn:true,doNotContact:false,phone:"+233241234567",lastContactedAt:"2026-08-10"}; expect(contactMatchesAudience(contact,{smsConsent:true,hasPhone:true,excludeContactedSince:"2026-08-01"},new Date("2026-08-14"))).toBe(false); });
+});

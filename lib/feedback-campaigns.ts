@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { deduplicateRecipients, normalizeGhanaPhone } from "@/lib/sms";
+import { AGE_GROUPS } from "@/lib/contacts";
 
 export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "custom_list", "other"] as const;
 export const defaultFeedbackMessage = "Satellite General Hospital: Thank you for allowing us to serve you. Please take 1-2 minutes to share your experience with us. Your feedback may be submitted anonymously. [SURVEY LINK]";
@@ -11,6 +12,7 @@ export const campaignCreateSchema = z.strictObject({
   name: z.string().trim().min(3).max(120),
   source: z.enum(campaignSources),
   message: controlledMessage,
+  audience: z.strictObject({ gender: z.enum(["all", "female", "male", "other", "prefer_not_to_say"]).default("all"), ageGroups: z.array(z.enum(AGE_GROUPS)).max(7).default([]), source: z.enum(campaignSources).default("all_contacts"), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]), smsConsent: z.boolean().default(true), hasPhone: z.boolean().default(true), excludeContactedSince: z.string().trim().max(10).default("") }).optional(),
 });
 
 export const recipientImportSchema = z.strictObject({ recipients: z.string().trim().min(1).max(12_000) });

@@ -46,7 +46,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const mocked = results.filter((result) => result.status === "mocked").length;
   const failed = results.filter((result) => result.status === "failed").length;
   const batch = adminDb.batch();
-  recipients.docs.forEach((doc, index) => batch.update(doc.ref, { status: results[index].status, providerId: results[index].providerId, attemptCount: FieldValue.increment(1), attemptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }));
+  recipients.docs.forEach((doc, index) => { batch.update(doc.ref, { status: results[index].status, providerId: results[index].providerId, attemptCount: FieldValue.increment(1), attemptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }); if (results[index].status !== "failed") batch.set(adminDb.collection("feedback_contacts").doc(doc.id), { lastContactedAt: FieldValue.serverTimestamp(), lastCampaignId: id, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); });
   batch.update(ref, { status: `${provider.mode}_complete`, mockedCount: FieldValue.increment(mocked), failedCount: FieldValue.increment(failed), queuedCount: FieldValue.increment(-results.length), updatedAt: FieldValue.serverTimestamp() });
   await batch.commit();
   await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_batch_started`, "feedback_campaign", id, { recipientCount: String(results.length) });

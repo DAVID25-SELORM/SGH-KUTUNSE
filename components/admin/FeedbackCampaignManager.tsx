@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { campaignSources, defaultFeedbackMessage } from "@/lib/feedback-campaigns";
+import { AGE_GROUPS } from "@/lib/contacts";
 
 type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
@@ -38,6 +39,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [tested, setTested] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
 
   async function run<T>(work: () => Promise<T>, success?: string) {
     setBusy(true); setNotice("");
@@ -49,7 +51,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   async function prepareRecipients() {
     const result = await run(async () => {
       const name = `${labels[source]} feedback - ${new Date().toLocaleDateString("en-GB")}`;
-      const created = await request("/api/admin/feedback/campaigns", { name, source, message });
+      const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10);
+      const created = await request("/api/admin/feedback/campaigns", { name, source, message, audience: { gender, ageGroups, source, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), smsConsent: true, hasPhone: true, excludeContactedSince } });
       const campaign: Campaign = { code: created.code, name, source, message, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, optedOutCount: 0, responseCount: 0 };
       const prepared = source === "custom_list"
         ? await request(`/api/admin/feedback/campaigns/${created.code}/recipients`, { recipients: customContacts })
@@ -93,15 +96,25 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
             {campaignSources.filter((item) => item !== "other").map((item) => <option key={item} value={item}>{labels[item]}</option>)}
           </select>
         </label>
+        {source !== "custom_list" && <label className="mt-4 block font-semibold">Exclude recently contacted
+          <select value={recentDays} onChange={(event) => setRecentDays(event.target.value)} className="mt-2 w-full rounded-xl border p-3 sm:max-w-xl">
+            <option value="0">Do not exclude by date</option>
+            <option value="7">Within the last 7 days</option>
+            <option value="30">Within the last 30 days</option>
+            <option value="90">Within the last 90 days</option>
+          </select>
+        </label>}
         {source === "custom_list" && <label className="mt-4 block font-semibold">Consented Ghana phone numbers
           <textarea value={customContacts} onChange={(event) => setCustomContacts(event.target.value)} rows={5} placeholder="One number per line or separated by commas" className="mt-2 w-full rounded-xl border p-3" />
         </label>}
+        {source !== "custom_list" && <div className="mt-5 grid gap-4 rounded-2xl bg-bg-soft p-4 sm:grid-cols-2"><label className="font-semibold">Gender<select value={gender} onChange={e=>setGender(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"><option value="all">All</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></label><label className="font-semibold">Facility or screening event<input value={facility} onChange={e=>setFacility(e.target.value)} placeholder="Kutunse Screening - Aug 2026" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Group<input value={group} onChange={e=>setGroup(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Tags<input value={tags} onChange={e=>setTags(e.target.value)} placeholder="outreach, follow-up" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><fieldset className="sm:col-span-2"><legend className="font-semibold">Age groups</legend><div className="mt-2 flex flex-wrap gap-2">{AGE_GROUPS.map(item=><label key={item} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm"><input type="checkbox" checked={ageGroups.includes(item)} onChange={e=>setAgeGroups(old=>e.target.checked?[...old,item]:old.filter(x=>x!==item))}/>{item.replaceAll("_","–").replace("65–plus","65+").replace("under–18","Under 18")}</label>)}</div></fieldset><p className="text-sm text-text-muted sm:col-span-2">Only active contacts with valid mobile numbers and SMS consent are included. Opt-outs and do-not-contact records are always excluded.</p></div>}
         <button disabled={busy || (source === "custom_list" && !customContacts.trim())} onClick={prepareRecipients} className="mt-5 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Preparing contacts…" : "Continue to review message"}</button>
       </div> : <>
         <div className="mt-7 flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="text-xl font-semibold">Recipients ready</h2><p className="text-sm text-text-muted">{labels[active.source] ?? active.source}</p></div>
           <button onClick={reset} className="rounded-xl border px-4 py-2 font-semibold">Change recipients</button>
         </div>
+        <p className="mt-4 rounded-xl bg-purple-deep p-4 text-lg font-semibold text-white">Selected audience: {active.queuedCount} contacts</p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[["Ready", active.queuedCount], ["Duplicates removed", preparation?.duplicateCount ?? 0], ["Opted out", preparation?.optedOut ?? 0], ["Invalid", preparation?.invalid ?? 0], ["Total reviewed", (preparation?.added ?? 0) + (preparation?.duplicateCount ?? 0) + (preparation?.invalid ?? 0)]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-xl text-purple-deep">{value}</strong><small>{label}</small></div>)}
         </div>

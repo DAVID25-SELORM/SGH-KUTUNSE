@@ -6,7 +6,8 @@ import { verifyAdminRequest } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
-import { ensureApprovedStaffContacts } from "@/lib/server/feedback-contacts";
+import { ensureApprovedStaffContacts, ensureLegacyCampaignContacts } from "@/lib/server/feedback-contacts";
+import { contactMatchesAudience, type AudienceFilters } from "@/lib/contacts";
 
 const CHUNK_SIZE = 400;
 
@@ -25,6 +26,7 @@ export async function POST(
   const actor = await verifyAdminRequest("feedback_campaigns");
   if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   await ensureApprovedStaffContacts();
+  await ensureLegacyCampaignContacts();
 
   const { id } = await context.params;
   const targetRef = adminDb.collection("feedback_campaigns").doc(id);
@@ -32,40 +34,22 @@ export async function POST(
   if (!target.exists)
     return NextResponse.json({ ok: false, message: "Campaign not found." }, { status: 404 });
   const targetSource = String(target.data()?.source ?? "");
+  const audience = (target.data()?.audience ?? { source: targetSource, smsConsent: true, hasPhone: true }) as AudienceFilters;
   if (targetSource === "custom_list")
     return NextResponse.json({ ok: false, message: "Custom lists must be supplied by the administrator." }, { status: 409 });
   if (!["draft", "ready"].includes(String(target.data()?.status)))
     return NextResponse.json({ ok: false, message: "Recipients cannot be changed after processing starts." }, { status: 409 });
 
-  const sourceCampaigns = targetSource === "all_contacts"
-    ? await adminDb.collection("feedback_campaigns").where("source", "!=", "all_contacts").limit(100).get()
-    : await adminDb.collection("feedback_campaigns").where("source", "==", targetSource).limit(100).get();
-  const sourceSnapshots = await Promise.all(
-    sourceCampaigns.docs.filter((campaign) => campaign.id !== id).map((campaign) =>
-      campaign.ref.collection("recipients").limit(5_000).get(),
-    ),
-  );
   const contactSnapshot = targetSource === "all_contacts"
     ? await adminDb.collection("feedback_contacts").limit(5_000).get()
     : await adminDb.collection("feedback_contacts").where("source", "==", targetSource).limit(5_000).get();
   const uniquePhones = new Map<string, string>();
   let invalid = 0;
   for (const document of contactSnapshot.docs) {
-    if (document.data().status === "opted_out") continue;
+    if (!contactMatchesAudience(document.data(), audience)) continue;
     const phone = normalizeGhanaPhone(String(document.data().phone ?? ""));
     if (!phone) { invalid++; continue; }
     uniquePhones.set(recipientKey(phone), phone);
-  }
-  for (const snapshot of sourceSnapshots) {
-    for (const document of snapshot.docs) {
-      if (document.data().status === "opted_out") continue;
-      const phone = normalizeGhanaPhone(String(document.data().phone ?? ""));
-      if (!phone) {
-        invalid++;
-        continue;
-      }
-      uniquePhones.set(recipientKey(phone), phone);
-    }
   }
   if (!uniquePhones.size)
     return NextResponse.json({ ok: false, message: "No eligible source contacts were found." }, { status: 409 });
