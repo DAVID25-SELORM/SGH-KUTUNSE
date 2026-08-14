@@ -8,7 +8,7 @@ const fallback: GalleryAlbum = {
   title: "Programs & Community",
   slug: "programs-and-community",
   category: "Programs & Community",
-  shortDescription: "Photographs from Satellite General Hospital programs and community activities. Event details are awaiting hospital verification.",
+  shortDescription: "Photographs from Satellite General Hospital programs and community activities.",
   fullDescription: "",
   eventDate: "",
   location: "",

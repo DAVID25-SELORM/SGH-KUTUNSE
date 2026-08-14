@@ -9,12 +9,10 @@ import { HOSPITAL } from "@/lib/constants";
 
 export const metadata: Metadata = buildMetadata({
   title: "Patient Portal",
-  description: `The ${HOSPITAL.name} patient portal is coming soon.`,
+  description: `Patient service and appointment support from ${HOSPITAL.name}.`,
   path: "/patient-portal",
 });
 
-// Stub route: the patient portal is not yet built. This page reserves the
-// route/navigation slot so the real portal can be wired in later.
 export default function PatientPortalPage() {
   return (
     <>
@@ -25,10 +23,10 @@ export default function PatientPortalPage() {
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-soft text-purple-deep">
               <LayoutDashboard className="h-7 w-7" aria-hidden="true" />
             </span>
-            <h2 className="mt-5 text-xl font-semibold text-text-dark">Coming Soon</h2>
+            <h2 className="mt-5 text-xl font-semibold text-text-dark">Patient Support</h2>
             <p className="mt-3 text-sm leading-relaxed text-text-body">
-              Our online patient portal is in development. In the meantime, please book an appointment or contact
-              the hospital directly.
+              To request an appointment or receive help with hospital services, use the options below. A hospital
+              representative will assist you directly.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button href="/appointments">Book Appointment</Button>

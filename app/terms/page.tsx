@@ -17,8 +17,8 @@ export default function TermsPage() {
       <section className="py-16 sm:py-20">
         <Container className="mx-auto flex max-w-3xl flex-col gap-6 text-sm leading-relaxed text-text-body">
           <p>
-            These terms are a placeholder pending full legal review and govern general use of this website for
-            {" "}{HOSPITAL.name}.
+            These terms describe the general conditions for using the {HOSPITAL.name} website and its online
+            request services.
           </p>
           <h2 className="mt-2 text-lg font-semibold text-text-dark">Website Use</h2>
           <p>

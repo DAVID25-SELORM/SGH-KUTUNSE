@@ -67,12 +67,7 @@ export default function ContactPage() {
                 <h3 className="mt-4 text-base font-semibold text-text-dark">Email</h3>
                 <p className="mt-1 text-sm text-text-body">{HOSPITAL.email}</p>
               </Card>
-            ) : (
-              <Card className="bg-bg-soft">
-                <h3 className="text-sm font-semibold text-text-dark">Email</h3>
-                <p className="mt-1 text-sm text-text-muted">Pending configuration.</p>
-              </Card>
-            )}
+            ) : null}
           </div>
 
           <Card className="lg:col-span-2">

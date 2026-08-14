@@ -44,7 +44,8 @@ export default function AboutPage() {
               care accessible, coordinated and comfortable for every patient who walks through our doors.
             </p>
             <p className="mt-4 text-sm leading-relaxed text-text-body sm:text-base">
-              Detailed hospital history and milestones will be added here as they are confirmed.
+              Our journey continues with a clear purpose: to provide accessible, reliable and patient-centred
+              healthcare while growing with the needs of our community.
             </p>
           </div>
           <figure>

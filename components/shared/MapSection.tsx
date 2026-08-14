@@ -20,9 +20,7 @@ export function MapSection({ className }: { className?: string }) {
             <p className="text-sm font-semibold text-text-dark">{HOSPITAL.name}</p>
             <p className="text-xs text-text-muted">{HOSPITAL.address}</p>
           </div>
-          <p className="max-w-xs text-xs text-text-muted">
-            Map embed placeholder — an interactive Google Map will be embedded here.
-          </p>
+          <p className="max-w-xs text-xs text-text-muted">Use Get Directions for navigation to the hospital.</p>
         </div>
       </div>
       <div className="flex flex-col items-stretch gap-3 bg-white p-4 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between">

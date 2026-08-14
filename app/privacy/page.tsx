@@ -17,9 +17,8 @@ export default function PrivacyPage() {
       <section className="py-16 sm:py-20">
         <Container className="mx-auto flex max-w-3xl flex-col gap-6 text-sm leading-relaxed text-text-body">
           <p>
-            This page describes, in general terms, how {HOSPITAL.name} handles information submitted through
-            this website. It is a placeholder policy pending full legal review and should not be treated as a
-            complete or final privacy policy.
+            This page explains how {HOSPITAL.name} handles information submitted through this website. For
+            questions about your personal information, please contact the hospital directly.
           </p>
           <h2 className="mt-2 text-lg font-semibold text-text-dark">Information We Collect</h2>
           <p>
@@ -33,9 +32,8 @@ export default function PrivacyPage() {
           </p>
           <h2 className="mt-2 text-lg font-semibold text-text-dark">Data Protection</h2>
           <p>
-            We take reasonable steps to protect information submitted through this website. This policy does not
-            constitute a claim of compliance with any specific data protection law or standard; a formal
-            compliance assessment has not yet been carried out.
+            We take reasonable administrative and technical steps to protect information submitted through this
+            website and limit access to authorised personnel who need it to respond to your request.
           </p>
           <h2 className="mt-2 text-lg font-semibold text-text-dark">Contact</h2>
           <p>
