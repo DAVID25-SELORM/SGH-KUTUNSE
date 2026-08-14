@@ -1,4 +1,5 @@
 import { ArrowRight, Baby, FlaskConical, HeartPulse, Video } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 
@@ -47,7 +48,17 @@ export function CareStories() {
               </Button>
             </div>
 
-            <div
+            {index === 0 ? (
+              <div className="relative min-h-[360px] overflow-hidden rounded-3xl bg-bg-soft sm:min-h-[480px] sm:rounded-[32px] lg:min-h-[540px]">
+                <Image
+                  src="/images/telemedicine/connected-care.jpeg"
+                  alt="Connected care from consultation and diagnostics through treatment and follow-up"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              </div>
+            ) : <div
               className={`group relative min-h-[360px] overflow-hidden rounded-3xl p-6 sm:min-h-[480px] sm:rounded-[32px] sm:p-10 lg:min-h-[540px] lg:p-12 ${
                 index % 2 ? "bg-purple-dark text-white lg:order-1" : "bg-bg-soft text-text-dark"
               }`}
@@ -63,7 +74,7 @@ export function CareStories() {
                   <p className={`mt-3 max-w-sm text-base leading-relaxed ${index % 2 ? "text-white/70" : "text-text-body"}`}>{panelCopy}</p>
                 </div>
               </div>
-            </div>
+            </div>}
           </article>
         ))}
       </Container>

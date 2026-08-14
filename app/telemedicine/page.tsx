@@ -36,7 +36,7 @@ export default function TelemedicinePage() {
       <section className="py-20 sm:py-24">
         <Container>
           <div className="relative mb-12 aspect-[3/2] overflow-hidden rounded-3xl bg-bg-soft">
-            <Image src="/images/telemedicine/video-consultation.jpg" alt="Healthcare professional conducting an online consultation" fill sizes="(max-width: 1280px) 100vw, 1200px" className="object-cover" preload unoptimized />
+            <Image src="/images/telemedicine/video-consultation.png" alt="Patient taking part in an online consultation from home" fill sizes="(max-width: 1280px) 100vw, 1200px" className="object-cover" preload />
           </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map(({ icon: Icon, title, description }, i) => (
