@@ -29,6 +29,20 @@ export function prepareContact(input: z.output<typeof contactSchema>) {
 }
 
 export type AudienceFilters = { gender?: string; ageGroups?: string[]; source?: string; facility?: string; group?: string; tags?: string[]; smsConsent?: boolean; hasPhone?: boolean; excludeContactedSince?: string };
+export type ContactDirectoryFilters = { q?: string; source?: string; gender?: string; ageGroup?: string; facility?: string; tag?: string; consent?: string; status?: string };
+export function contactMatchesDirectoryFilters(contact: Record<string, unknown>, filters: ContactDirectoryFilters) {
+  const q = String(filters.q ?? "").trim().toLowerCase();
+  return (!q || [contact.fullName, contact.name, contact.phone, contact.email, contact.reference].some(value => String(value ?? "").toLowerCase().includes(q))) &&
+    (!filters.source || contact.source === filters.source || (Array.isArray(contact.sources) && contact.sources.includes(filters.source))) &&
+    (!filters.gender || contact.gender === filters.gender) && (!filters.ageGroup || contact.ageGroup === filters.ageGroup) &&
+    (!filters.facility || String(contact.facility ?? "").toLowerCase().includes(filters.facility.toLowerCase())) &&
+    (!filters.tag || (Array.isArray(contact.tags) && contact.tags.map(String).some(tag => tag.toLowerCase().includes(filters.tag!.toLowerCase())))) &&
+    (!filters.consent || (filters.consent === "sms" ? contact.smsOptIn === true : filters.consent === "email" ? contact.emailOptIn === true : contact.doNotContact === true)) &&
+    (!filters.status || contact.status === filters.status);
+}
+export function isSmsEligibleContact(contact: Record<string, unknown>) {
+  return contact.status === "active" && contact.smsOptIn === true && contact.doNotContact !== true && Boolean(normalizeGhanaPhone(String(contact.normalizedPhone ?? contact.phone ?? "")));
+}
 export function contactMatchesAudience(contact: Record<string, unknown>, filters: AudienceFilters, now = new Date()) {
   if (contact.status !== "active" || contact.doNotContact === true) return false;
   if (filters.smsConsent && contact.smsOptIn !== true) return false;
