@@ -2,9 +2,11 @@ import { FeedbackContactForm } from "@/components/admin/FeedbackContactForm";
 import { humanizeFeedbackValue } from "@/lib/feedback-display";
 import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
+import { ensureApprovedStaffContacts } from "@/lib/server/feedback-contacts";
 
 export default async function FeedbackContactsPage({ searchParams }: { searchParams: Promise<{ q?: string; source?: string }> }) {
   await requireAdmin("feedback_campaigns");
+  await ensureApprovedStaffContacts();
   const filters = await searchParams;
   const q = String(filters.q ?? "").trim().toLowerCase();
   const source = String(filters.source ?? "");

@@ -6,6 +6,7 @@ import { verifyAdminRequest } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
+import { ensureApprovedStaffContacts } from "@/lib/server/feedback-contacts";
 
 const CHUNK_SIZE = 400;
 
@@ -23,6 +24,7 @@ export async function POST(
     return NextResponse.json({ ok: false }, { status: 403 });
   const actor = await verifyAdminRequest("feedback_campaigns");
   if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
+  await ensureApprovedStaffContacts();
 
   const { id } = await context.params;
   const targetRef = adminDb.collection("feedback_campaigns").doc(id);
