@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { hasPermission } from "@/lib/types/admin";
@@ -30,6 +31,9 @@ export default async function Page({
   ]);
   return (
     <section>
+      <Link href="/admin/feedback" className="mb-5 inline-flex min-h-11 items-center rounded-xl border bg-white px-4 py-2 font-semibold text-purple-deep hover:bg-bg-soft">
+        ← Back to feedback inbox
+      </Link>
       <p className="text-sm font-semibold text-pink-accent">
         FEEDBACK RESPONSE
       </p>

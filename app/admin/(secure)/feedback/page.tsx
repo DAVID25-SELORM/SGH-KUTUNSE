@@ -5,6 +5,10 @@ import { adminDb } from "@/lib/server/firebase-admin";
 type Row = Record<string, unknown> & { id: string };
 const ratingLabels = { reception: "Reception", waitingTime: "Waiting time", professionalism: "Professionalism", cleanliness: "Cleanliness", communication: "Communication", overallQuality: "Overall quality" };
 const text = (value: unknown) => String(value ?? "").toLowerCase();
+const submissionDate = (value: unknown) => {
+  const timestamp = value as { toDate?: () => Date } | null | undefined;
+  return timestamp?.toDate?.().toISOString().slice(0, 10) ?? "";
+};
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requireAdmin("feedback");
@@ -17,7 +21,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const recommend = rows.filter((r) => ["definitely", "probably"].includes(text(r.recommendation))).length;
   const today = new Date().toISOString().slice(0, 10);
   const cards: Array<[string, string | number]> = [
-    ["Total responses", rows.length], ["Responses today", rows.filter((r) => r.visitDate === today).length],
+    ["Total responses", rows.length], ["Responses today", rows.filter((r) => submissionDate(r.createdAt) === today).length],
     ["Average satisfaction", rows.length ? `${average("overallQuality").toFixed(1)} / 5` : "No data"],
     ["Recommendation rate", rows.length ? `${Math.round(recommend / rows.length * 100)}%` : "No data"],
     ["Needs review", rows.filter((r) => r.needsReview).length], ["Follow-ups requested", rows.filter((r) => r.contactRequested).length],
