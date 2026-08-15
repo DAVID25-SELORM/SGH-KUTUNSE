@@ -22,6 +22,10 @@ const email = z
   .email("Please enter a valid email")
   .max(254);
 const date = z.iso.date();
+const pastOrTodayDate = date.refine(
+  (value) => value <= new Date().toISOString().slice(0, 10),
+  "Date of visit cannot be in the future.",
+);
 const honeypot = z.string().max(0).optional();
 
 export const appointmentSchema = z.strictObject({
@@ -96,7 +100,7 @@ export const feedbackSchema = z
     visitType: z.enum(["health_screening", "facility_visit"]),
     serviceUnit: optional(120),
     otherService: optional(120),
-    visitDate: date,
+    visitDate: pastOrTodayDate,
     ratings: z.strictObject({
       reception: rating,
       waitingTime: rating,

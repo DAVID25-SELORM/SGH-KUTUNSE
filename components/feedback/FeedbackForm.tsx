@@ -175,6 +175,7 @@ export function FeedbackForm({ initialTracking }: { initialTracking: { campaign:
             Date of visit
             <input
               type="date"
+              max={new Date().toISOString().slice(0, 10)}
               {...register("visitDate")}
               className="mt-2 w-full rounded-xl border p-3"
             />
