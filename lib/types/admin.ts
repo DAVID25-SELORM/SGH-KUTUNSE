@@ -1,11 +1,11 @@
 export const ADMIN_ROLES = ["super_admin", "admin", "reception", "insurance", "corporate", "content_editor", "viewer"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
-export type Permission = "appointments" | "contact" | "insurance" | "corporate" | "telemedicine" | "content" | "users" | "audit" | "feedback" | "feedback_manage" | "feedback_receipts" | "feedback_campaigns" | "feedback_sms" | "contacts" | "contacts_manage";
+export type Permission = "appointments" | "contact" | "insurance" | "corporate" | "telemedicine" | "content" | "users" | "audit" | "feedback" | "feedback_manage" | "feedback_receipts" | "feedback_campaigns" | "feedback_sms" | "contacts" | "contacts_manage" | "sms_settings_view" | "sms_settings_write";
 
 const grants: Record<AdminRole, readonly Permission[]> = {
-  super_admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "users", "audit", "feedback", "feedback_manage", "feedback_receipts", "feedback_campaigns", "feedback_sms", "contacts", "contacts_manage"],
-  admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "audit", "feedback", "feedback_manage", "feedback_campaigns", "contacts", "contacts_manage"],
+  super_admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "users", "audit", "feedback", "feedback_manage", "feedback_receipts", "feedback_campaigns", "feedback_sms", "contacts", "contacts_manage", "sms_settings_view", "sms_settings_write"],
+  admin: ["appointments", "contact", "insurance", "corporate", "telemedicine", "content", "audit", "feedback", "feedback_manage", "feedback_campaigns", "contacts", "contacts_manage", "sms_settings_view"],
   reception: ["appointments", "contact", "telemedicine", "feedback", "feedback_manage", "contacts"],
   insurance: ["insurance"],
   corporate: ["corporate"],

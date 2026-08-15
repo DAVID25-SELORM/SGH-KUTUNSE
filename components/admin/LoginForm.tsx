@@ -4,11 +4,13 @@ import { useState } from "react";
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   async function submit(formData: FormData) {
     setBusy(true); setMessage("");
     try {
@@ -30,7 +32,7 @@ export function LoginForm() {
   }
   return <form action={submit} className="flex flex-col gap-5">
     <label className="text-sm font-semibold">Email<input name="email" type="email" required autoComplete="username" className="mt-2 w-full rounded-xl border border-border-default px-4 py-3" /></label>
-    <label className="text-sm font-semibold">Password<input name="password" type="password" required autoComplete="current-password" className="mt-2 w-full rounded-xl border border-border-default px-4 py-3" /></label>
+    <label className="text-sm font-semibold">Password<span className="relative mt-2 block"><input name="password" type={showPassword ? "text" : "password"} required autoComplete="current-password" className="w-full rounded-xl border border-border-default py-3 pr-12 pl-4" /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-text-muted hover:text-purple-deep">{showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}</button></span></label>
     {message && <p className="rounded-xl bg-bg-soft p-3 text-sm" role="status">{message}</p>}
     <button disabled={busy} className="rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Signing in…" : "Sign in"}</button>
     <button type="button" onClick={(event) => reset(new FormData(event.currentTarget.form!))} className="text-sm font-semibold text-purple-deep">Reset password</button>

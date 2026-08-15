@@ -6,11 +6,12 @@ import { adminDb } from "@/lib/server/firebase-admin";
 import { getSmsProvider } from "@/lib/server/sms";
 import { hasPermission } from "@/lib/types/admin";
 import { smsSchedulingEnabled } from "@/lib/server/sms-scheduler";
+import { getSmsPolicy } from "@/lib/server/sms-settings";
 
 export default async function Page() {
   const session = await requireAdmin("feedback_campaigns");
   const provider = getSmsProvider();
-  const snapshot = await adminDb.collection("feedback_campaigns").orderBy("createdAt", "desc").limit(50).get();
+  const [snapshot, smsPolicy] = await Promise.all([adminDb.collection("feedback_campaigns").orderBy("createdAt", "desc").limit(50).get(), getSmsPolicy()]);
   const campaigns = snapshot.docs.map((doc) => {
     const data = doc.data();
     return {
@@ -34,7 +35,7 @@ export default async function Page() {
       <strong>Automatic test verification</strong>
       <p className="mt-2 text-sm">After the test recipient opens the secure link and submits feedback successfully, bulk sending unlocks automatically.</p>
     </div>
-    <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} />
+    <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} initialSmsPolicy={smsPolicy} />
     {session.role === "super_admin" ? <ConsentMigrationPanel /> : null}
     <div className="mt-8"><FeedbackQr /></div>
   </section>;

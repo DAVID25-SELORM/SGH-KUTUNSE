@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { campaignSources, defaultFeedbackMessage } from "@/lib/feedback-campaigns";
 import { AGE_GROUPS } from "@/lib/contacts";
+import Link from "next/link";
+import { isDateWithinSmsPolicy, isTimeWithinSmsPolicy, smsPolicyLabel, type SmsPolicy } from "@/lib/sms-policy";
 
 type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
@@ -36,8 +38,8 @@ function AudienceCalculation({ summary, loading }: { summary: AudienceSummary | 
   return <section className="mt-5 rounded-2xl border bg-white p-4"><h3 className="font-semibold text-purple-deep">Audience calculation</h3><p className="mt-2 font-semibold">{summary.filterMatches} of {summary.totalContacts} contacts match your filters</p><p className="text-lg font-semibold text-emerald-800">{summary.eligible} are eligible for SMS</p><div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">{[["Active", summary.active], ["Valid mobile", summary.validMobile], ["SMS consent", summary.smsConsent], ["No consent", summary.noConsent], ["Invalid / missing phone", summary.invalidPhone], ["Opted out", summary.optedOut], ["Do not contact", summary.doNotContact], ["Duplicates", summary.duplicates], ["Other exclusions", summary.otherExclusions]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-bg-soft p-3"><strong className="block text-lg">{value}</strong>{label}</div>)}</div>{summary.eligible === 0 && <p className="mt-4 rounded-xl bg-amber-50 p-3 font-semibold">No eligible recipients. {summary.noConsent ? `${summary.noConsent} matching contacts have no recorded SMS consent.` : "Review the exclusion counts above."}</p>}</section>;
 }
 
-export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMode, schedulingEnabled }: {
-  initialCampaigns: Campaign[]; canSend: boolean; providerMode: "mock" | "sandbox" | "live"; schedulingEnabled: boolean;
+export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMode, schedulingEnabled, initialSmsPolicy }: {
+  initialCampaigns: Campaign[]; canSend: boolean; providerMode: "mock" | "sandbox" | "live"; schedulingEnabled: boolean; initialSmsPolicy: SmsPolicy;
 }) {
   const [items, setItems] = useState(initialCampaigns);
   const [source, setSource] = useState<(typeof campaignSources)[number]>("health_screening");
@@ -54,7 +56,12 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [deliveryOption, setDeliveryOption] = useState<"now" | "schedule">("now");
   const [scheduleDate, setScheduleDate] = useState(""), [scheduleTime, setScheduleTime] = useState("");
   const [editingSchedule, setEditingSchedule] = useState(false);
+  const [smsPolicy, setSmsPolicy] = useState(initialSmsPolicy);
   const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
+
+  useEffect(() => {
+    fetch("/api/admin/settings/sms").then(response => response.ok ? response.json() : null).then(data => { if (data?.policy) setSmsPolicy(data.policy); }).catch(() => { /* Server validation remains authoritative if refresh fails. */ });
+  }, []);
 
   async function run<T>(work: () => Promise<T>, success?: string) {
     setBusy(true); setNotice("");
@@ -123,6 +130,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   }
 
   async function scheduleCampaign(action: "schedule" | "reschedule" = "schedule") {
+    if (!isTimeWithinSmsPolicy(scheduleTime, smsPolicy)) { setNotice(`Choose a time within the hospital SMS sending window: ${smsPolicyLabel(smsPolicy)}.`); return; }
     if (!active?.testVerified || !window.confirm(`${action === "reschedule" ? "Reschedule" : "Schedule"} this campaign for ${scheduleDate} at ${scheduleTime} Africa/Accra?`)) return;
     await run(async () => {
       const result = await request(`/api/admin/feedback/campaigns/${active.code}/schedule`, { action, date: scheduleDate, time: scheduleTime, timezone: "Africa/Accra" });
@@ -164,6 +172,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const currentStep = !active ? 1 : !tested ? 2 : !active.testVerified ? 3 : active.status === "completed" ? 5 : 4;
 
   return <div className="mt-6 space-y-8">
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm"><div><p className="text-sm font-semibold text-text-muted">SMS Sending Policy</p><strong className="text-lg text-purple-deep">{smsPolicyLabel(smsPolicy)}</strong></div><Link href="/admin/settings/sms" className="font-semibold text-purple-deep">Manage SMS Settings</Link></section>
     <section className="rounded-2xl border bg-white p-5 sm:p-6">
       <ol className="grid gap-2 sm:grid-cols-5" aria-label="Send feedback SMS steps">
         {steps.map((step, index) => <li key={step} className={`rounded-xl px-3 py-3 text-sm font-semibold ${currentStep >= index + 1 ? "bg-purple-deep text-white" : "bg-bg-soft text-text-muted"}`}>{index + 1}. {step}</li>)}
@@ -226,8 +235,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
           </ul>
           <p className={`mt-4 font-semibold ${active.testVerified ? "text-emerald-800" : "text-amber-800"}`}>{active.testVerified ? "Ready to Send" : "Bulk sending is locked until the test is verified."}</p>
           {active.testVerified && active.status !== "scheduled" && <fieldset className="mt-4"><legend className="font-semibold">Delivery time</legend><div className="mt-2 flex flex-wrap gap-3"><label className="rounded-xl border bg-white px-4 py-3"><input className="mr-2" type="radio" checked={deliveryOption === "now"} onChange={() => setDeliveryOption("now")}/>Send now</label><label className="rounded-xl border bg-white px-4 py-3"><input className="mr-2" type="radio" checked={deliveryOption === "schedule"} onChange={() => setDeliveryOption("schedule")} disabled={!schedulingEnabled}/>Schedule later</label></div>{!schedulingEnabled && <p className="mt-2 text-sm text-amber-800">Scheduling becomes available after the secure Cloud Tasks queue and service identity are configured.</p>}</fieldset>}
-          {deliveryOption === "schedule" && (active.status !== "scheduled" || editingSchedule) && <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="font-semibold">Date<input type="date" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Time (Africa/Accra)<input type="time" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label></div>}
-          {active.status === "scheduled" && !editingSchedule ? <div className="mt-4 rounded-xl border border-purple-deep bg-white p-4"><strong>Scheduled</strong><p>{active.scheduledAt ? new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(active.scheduledAt)) : "Time unavailable"} (Africa/Accra)</p>{active.scheduledByName && <p className="text-sm">Scheduled by: {active.scheduledByName}</p>}<p className="text-sm text-text-muted">The final eligible audience will be recalculated before delivery.</p><div className="mt-3 flex gap-2"><button onClick={()=>{setDeliveryOption("schedule"); setEditingSchedule(true);}} className="rounded-xl border px-4 py-2 font-semibold">Reschedule</button><button onClick={cancelSchedule} className="rounded-xl border border-red-700 px-4 py-2 font-semibold text-red-700">Cancel scheduled send</button></div></div> : deliveryOption === "schedule" ? <button disabled={busy || !active.testVerified || !canSend || !scheduleDate || !scheduleTime || !schedulingEnabled} onClick={()=>scheduleCampaign(active.scheduledAt ? "reschedule" : "schedule")} className="mt-3 min-h-12 rounded-xl bg-purple-deep px-6 py-3 font-semibold text-white disabled:opacity-50">{active.scheduledAt ? "Save new schedule" : `Schedule SMS to ${active.queuedCount} Recipients`}</button> : <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Final action: Send SMS to {active.queuedCount} Recipients</button>}
+          {deliveryOption === "schedule" && (active.status !== "scheduled" || editingSchedule) && <div className="mt-4"><p className="mb-3 rounded-xl bg-white p-3 text-sm"><strong>Hospital SMS sending window</strong><br/>{smsPolicyLabel(smsPolicy)}</p><div className="grid gap-3 sm:grid-cols-2"><label className="font-semibold">Date<input type="date" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Time (Ghana time / GMT)<input type="time" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label></div></div>}
+          {active.status === "scheduled" && !editingSchedule ? <div className="mt-4 rounded-xl border border-purple-deep bg-white p-4"><strong>Scheduled</strong><p>{active.scheduledAt ? new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(active.scheduledAt)) : "Time unavailable"} (Ghana time / GMT)</p>{active.scheduledAt && !isDateWithinSmsPolicy(new Date(active.scheduledAt), smsPolicy) && <p className="mt-2 rounded-lg bg-amber-50 p-3 font-semibold text-amber-900">This campaign is scheduled outside the hospital’s current SMS sending hours and will not execute unless rescheduled or the policy changes.</p>}{active.scheduledByName && <p className="text-sm">Scheduled by: {active.scheduledByName}</p>}<p className="text-sm text-text-muted">The final eligible audience and current SMS policy will be checked again before delivery.</p><div className="mt-3 flex gap-2"><button onClick={()=>{setDeliveryOption("schedule"); setEditingSchedule(true);}} className="rounded-xl border px-4 py-2 font-semibold">Reschedule</button><button onClick={cancelSchedule} className="rounded-xl border border-red-700 px-4 py-2 font-semibold text-red-700">Cancel scheduled send</button></div></div> : deliveryOption === "schedule" ? <button disabled={busy || !active.testVerified || !canSend || !scheduleDate || !scheduleTime || !schedulingEnabled || !isTimeWithinSmsPolicy(scheduleTime, smsPolicy)} onClick={()=>scheduleCampaign(active.scheduledAt ? "reschedule" : "schedule")} className="mt-3 min-h-12 rounded-xl bg-purple-deep px-6 py-3 font-semibold text-white disabled:opacity-50">{active.scheduledAt ? "Save new schedule" : `Schedule SMS to ${active.queuedCount} Recipients`}</button> : <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Final action: Send SMS to {active.queuedCount} Recipients</button>}
         </div>
       </>}
     </section>

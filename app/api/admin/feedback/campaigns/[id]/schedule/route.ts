@@ -8,6 +8,7 @@ import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
 import { createScheduledSmsTask, deleteScheduledSmsTask, formatAccraSchedule, smsSchedulingEnabled, validateSmsSchedule } from "@/lib/server/sms-scheduler";
+import { getSmsPolicy } from "@/lib/server/sms-settings";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
@@ -32,7 +33,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (campaign.testVerified !== true || !["test_verified", "scheduled", "cancelled"].includes(String(campaign.status))) return NextResponse.json({ ok: false, message: "Complete and verify the test before scheduling." }, { status: 409 });
-  const validation = validateSmsSchedule(parsed.data.date, parsed.data.time);
+  const policy = await getSmsPolicy();
+  const validation = validateSmsSchedule(parsed.data.date, parsed.data.time, policy);
   if (!validation.ok) return NextResponse.json({ ok: false, message: validation.message }, { status: 400 });
   const audience = campaignAudienceSchema.safeParse(campaign.audience);
   if (!audience.success) return NextResponse.json({ ok: false, message: "This campaign does not have a valid saved audience." }, { status: 409 });

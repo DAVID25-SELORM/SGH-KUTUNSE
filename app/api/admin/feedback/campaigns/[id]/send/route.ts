@@ -13,6 +13,8 @@ import { parseJson } from "@/lib/server/request";
 import { getSmsProvider } from "@/lib/server/sms";
 import { verifyScheduledTaskRequest } from "@/lib/server/sms-scheduler";
 import { loadCampaignAudience } from "@/lib/server/campaign-audience";
+import { getSmsPolicy } from "@/lib/server/sms-settings";
+import { isDateWithinSmsPolicy, smsPolicyRestrictionMessage } from "@/lib/sms-policy";
 
 export const maxDuration = 300;
 
@@ -80,6 +82,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await batch.commit();
     await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
     return NextResponse.json({ ok: true, status: result.status, mode: provider.mode });
+  }
+  if (parsed.data.action === "batch" || isScheduled) {
+    const currentPolicy = await getSmsPolicy();
+    if (!isDateWithinSmsPolicy(new Date(), currentPolicy)) {
+      if (isScheduled) {
+        await ref.update({ status: "scheduled_send_blocked", scheduledSendBlockedAt: FieldValue.serverTimestamp(), scheduledSendBlockedReason: "outside_current_sending_window", updatedAt: FieldValue.serverTimestamp() });
+        await writeAudit(actor.uid, "feedback_campaign.scheduled_send_blocked", "feedback_campaign", id, { reason: "outside_current_sending_window", startTime: currentPolicy.sendingStartTime, endTime: currentPolicy.sendingEndTime, timezone: currentPolicy.timezone });
+        return NextResponse.json({ ok: true, status: "scheduled_send_blocked", reason: "outside_current_sending_window", message: smsPolicyRestrictionMessage(currentPolicy) });
+      }
+      return NextResponse.json({ ok: false, message: smsPolicyRestrictionMessage(currentPolicy) }, { status: 409 });
+    }
   }
   const currentLease = campaign.processingLeaseUntil?.toDate?.();
   const recoveryWindowOpen = campaign.status === "sending" && currentLease instanceof Date && currentLease.getTime() <= Date.now();

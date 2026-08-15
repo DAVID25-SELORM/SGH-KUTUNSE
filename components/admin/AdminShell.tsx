@@ -116,6 +116,12 @@ const groups: Array<{
     ],
   },
   {
+    label: "Settings",
+    items: [
+      { href: "/admin/settings/sms", label: "SMS settings", icon: Settings, permission: "sms_settings_view" },
+    ],
+  },
+  {
     label: "Administration",
     items: [
       {

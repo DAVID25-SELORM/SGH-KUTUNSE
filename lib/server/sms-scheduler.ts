@@ -1,9 +1,9 @@
 import "server-only";
 import { CloudTasksClient } from "@google-cloud/tasks";
 import { OAuth2Client } from "google-auth-library";
+import { isDateWithinSmsPolicy, smsPolicyRestrictionMessage, type SmsPolicy } from "@/lib/sms-policy";
 
 export const HOSPITAL_TIMEZONE = "Africa/Accra";
-export const SMS_QUIET_HOURS = { start: Number(process.env.SMS_SEND_START_HOUR || 8), end: Number(process.env.SMS_SEND_END_HOUR || 19) } as const;
 const project = process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "satelitegeneralhospital";
 const location = process.env.SMS_TASK_LOCATION || "us-east4";
 const queue = process.env.SMS_TASK_QUEUE || "sgh-sms-schedules";
@@ -20,12 +20,12 @@ export function parseAccraSchedule(date: string, time: string) {
   if (Number.isNaN(value.valueOf()) || value.toISOString().slice(0, 10) !== date) return null;
   return value;
 }
-export function withinSmsHours(value: Date) { const hour = value.getUTCHours(); return hour >= SMS_QUIET_HOURS.start && hour < SMS_QUIET_HOURS.end; }
-export function validateSmsSchedule(date: string, time: string, now = new Date()) {
+export function withinSmsHours(value: Date, policy: SmsPolicy) { return isDateWithinSmsPolicy(value, policy); }
+export function validateSmsSchedule(date: string, time: string, policy: SmsPolicy, now = new Date()) {
   const value = parseAccraSchedule(date, time);
   if (!value) return { ok: false as const, message: "Enter a valid date and time." };
   if (value.getTime() < now.getTime() + 5 * 60_000) return { ok: false as const, message: "Schedule at least 5 minutes in the future." };
-  if (!withinSmsHours(value)) return { ok: false as const, message: `Choose a time from ${SMS_QUIET_HOURS.start}:00 to ${SMS_QUIET_HOURS.end}:00 Africa/Accra.` };
+  if (!withinSmsHours(value, policy)) return { ok: false as const, message: smsPolicyRestrictionMessage(policy) };
   return { ok: true as const, value };
 }
 export function smsSchedulingEnabled() { return process.env.SMS_SCHEDULING_ENABLED === "true"; }
