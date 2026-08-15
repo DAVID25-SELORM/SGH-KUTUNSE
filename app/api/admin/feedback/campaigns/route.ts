@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 import { campaignCreateSchema } from "@/lib/feedback-campaigns";
@@ -15,7 +15,8 @@ export async function POST(request: Request) {
   const parsed = await parseJson(request, campaignCreateSchema);
   if (parsed.error) return parsed.error;
   const code = randomBytes(12).toString("base64url");
-  await adminDb.collection("feedback_campaigns").doc(code).create({ ...parsed.data, code, status: "draft", providerMode: "mock", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, responseCount: 0, createdBy: actor.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-  await writeAudit(actor.uid, "feedback_campaign.created", "feedback_campaign", code, { source: parsed.data.source });
+  const messageHash = createHash("sha256").update(parsed.data.message).digest("hex");
+  await adminDb.collection("feedback_campaigns").doc(code).create({ ...parsed.data, code, status: "draft", messageVersion: 1, messageHash, testedMessageHash: null, providerMode: "mock", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, responseCount: 0, createdBy: actor.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+  await writeAudit(actor.uid, "sms_campaign.message_created", "feedback_campaign", code, { source: parsed.data.source, purpose: parsed.data.purpose, messageHash });
   return NextResponse.json({ ok: true, code }, { status: 201 });
 }

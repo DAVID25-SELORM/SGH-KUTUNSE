@@ -6,6 +6,7 @@ import { AGE_GROUPS } from "@/lib/contacts";
 import Link from "next/link";
 import { isDateWithinSmsPolicy, isTimeWithinSmsPolicy, smsPolicyLabel, type SmsPolicy } from "@/lib/sms-policy";
 import { mergeCampaignVerificationStatus } from "@/lib/feedback-verification-state";
+import { campaignPurposes, maxSmsCharacters, purposeConsentScope, purposeLabels, resolveMessagePreview, smsEncoding, smsSegmentCount, smsTemplates, type CampaignPurpose } from "@/lib/sms-message";
 
 type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
@@ -13,6 +14,7 @@ type Campaign = {
   deliveredCount: number; failedCount: number; unknownCount: number; optedOutCount: number; responseCount: number;
   testSmsAccepted?: boolean; testLinkOpened?: boolean; testFeedbackSubmitted?: boolean; testVerified?: boolean;
   audience?: Record<string, unknown>;
+  purpose?: CampaignPurpose; templateId?: string; messageMode?: "template" | "custom"; messageHash?: string; testedMessageHash?: string;
   scheduledAt?: string; scheduledTimezone?: string; scheduledByName?: string; originalEligibleCount?: number;
 };
 type AudienceSummary = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
@@ -46,6 +48,9 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [source, setSource] = useState<(typeof campaignSources)[number]>("health_screening");
   const [customContacts, setCustomContacts] = useState("");
   const [message, setMessage] = useState(defaultFeedbackMessage);
+  const [purpose, setPurpose] = useState<CampaignPurpose>("feedback_request");
+  const [messageMode, setMessageMode] = useState<"template" | "custom">("template");
+  const [templateId, setTemplateId] = useState("patient_feedback");
   const [testPhone, setTestPhone] = useState("");
   const [active, setActive] = useState<Campaign | null>(null);
   const [preparation, setPreparation] = useState<Preparation | null>(null);
@@ -71,7 +76,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     finally { setBusy(false); }
   }
 
-  const audienceFilters = useCallback((selectedSource = source) => { const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10); return { gender, ageGroups, source: selectedSource, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), purpose: "feedback_request" as const, smsConsent: true, hasPhone: true, excludeContactedSince }; }, [source, gender, ageGroups, facility, group, tags, recentDays]);
+  const audienceFilters = useCallback((selectedSource = source) => { const excludeContactedSince = recentDays === "0" ? "" : new Date(Date.now() - Number(recentDays) * 86400000).toISOString().slice(0, 10); return { gender, ageGroups, source: selectedSource, facility, group, tags: tags.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean), purpose: purposeConsentScope[purpose], smsConsent: true, hasPhone: true, excludeContactedSince }; }, [source, gender, ageGroups, facility, group, tags, recentDays, purpose]);
 
   useEffect(() => {
     if (source === "custom_list") return;
@@ -82,9 +87,9 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
   async function prepareRecipients() {
     const result = await run(async () => {
-      const name = `${labels[source]} feedback - ${new Date().toLocaleDateString("en-GB")}`;
-      const created = await request("/api/admin/feedback/campaigns", { name, source, message, audience: audienceFilters() });
-      const campaign: Campaign = { code: created.code, name, source, message, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, unknownCount: 0, optedOutCount: 0, responseCount: 0 };
+      const name = `${labels[source]} ${purposeLabels[purpose]} - ${new Date().toLocaleDateString("en-GB")}`;
+      const created = await request("/api/admin/feedback/campaigns", { name, source, message, purpose, templateId, messageMode, audience: audienceFilters() });
+      const campaign: Campaign = { code: created.code, name, source, message, purpose, templateId, messageMode, status: "draft", recipientCount: 0, queuedCount: 0, mockedCount: 0, acceptedCount: 0, deliveredCount: 0, failedCount: 0, unknownCount: 0, optedOutCount: 0, responseCount: 0 };
       const prepared = source === "custom_list"
         ? await request(`/api/admin/feedback/campaigns/${created.code}/recipients`, { recipients: customContacts })
         : await request(`/api/admin/feedback/campaigns/${created.code}/recipients/all`, {});
@@ -99,20 +104,21 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   async function sendTest() {
     if (!active) return;
     await run(async () => {
-      await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "test", testPhone, confirmation: "SEND TEST" });
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "test", testPhone, confirmation: "SEND TEST" });
       setTested(true);
-      setActive((current) => current ? { ...current, status: "test_sent", testSmsAccepted: true } : current);
+      setActive((current) => current ? { ...current, status: String(result.status), testSmsAccepted: true, testVerified: result.testVerified === true } : current);
     }, providerMode === "live" ? "Live test SMS accepted by Arkesel. Check the handset and open the survey link." : providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Mock test passed. No real SMS was sent.");
   }
 
   async function saveMessage() {
     if (!active) return;
     await run(async () => {
-      const result = await request(`/api/admin/feedback/campaigns/${active.code}`, { message }, "PATCH");
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}`, { message, purpose, templateId, messageMode }, "PATCH");
       const savedMessage = String(result.message);
       setMessage(savedMessage);
-      setActive((current) => current ? { ...current, message: savedMessage } : current);
-      setItems((old) => old.map((item) => item.code === active.code ? { ...item, message: savedMessage } : item));
+      setActive((current) => current ? { ...current, message: savedMessage, purpose, templateId, messageMode, messageHash: String(result.messageHash), status: "ready", testSmsAccepted: false, testVerified: false, testedMessageHash: undefined } : current);
+      setItems((old) => old.map((item) => item.code === active.code ? { ...item, message: savedMessage, purpose, templateId, messageMode, status: "ready", testSmsAccepted: false, testVerified: false } : item));
+      setTested(false);
     }, "Message saved. Send the test SMS to verify this exact message.");
   }
 
@@ -164,7 +170,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   }
 
   async function resumeCampaign(campaign: Campaign) {
-    setActive(campaign); setMessage(campaign.message); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
+    setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
     if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
@@ -178,17 +184,18 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function reset() { setActive(null); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
+  function reset() { setActive(null); setPurpose("feedback_request"); setTemplateId("patient_feedback"); setMessageMode("template"); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
 
-  const steps = ["Audience", "Message", "Test", "Send", "Results"];
-  const currentStep = !active ? 1 : !tested ? 2 : !active.testVerified ? 3 : active.status === "completed" ? 5 : 4;
-  const canEditMessage = Boolean(active && ["draft", "ready"].includes(active.status) && !active.testSmsAccepted && !active.testVerified);
-  const hasUnsavedMessage = Boolean(active && message !== active.message);
+  const steps = ["Audience", "Purpose", "Message", "Preview", "Test", "Send / Schedule", "Results"];
+  const currentStep = !active ? 1 : !tested ? 4 : !active.testVerified ? 5 : active.status === "completed" ? 7 : 6;
+  const canEditMessage = Boolean(active && ["draft", "ready", "test_sent", "test_link_opened", "test_verified"].includes(active.status));
+  const hasUnsavedMessage = Boolean(active && (message !== active.message || purpose !== (active.purpose ?? "feedback_request") || templateId !== (active.templateId ?? "patient_feedback") || messageMode !== (active.messageMode ?? "template")));
+  const segments = smsSegmentCount(message); const previewMessage = resolveMessagePreview(message);
 
   return <div className="mt-6 space-y-8">
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm"><div><p className="text-sm font-semibold text-text-muted">SMS Sending Policy</p><strong className="text-lg text-purple-deep">{smsPolicyLabel(smsPolicy)}</strong></div><Link href="/admin/settings/sms" className="font-semibold text-purple-deep">Manage SMS Settings</Link></section>
     <section className="rounded-2xl border bg-white p-5 sm:p-6">
-      <ol className="grid gap-2 sm:grid-cols-5" aria-label="Send feedback SMS steps">
+      <ol className="grid gap-2 sm:grid-cols-7" aria-label="Send SMS campaign steps">
         {steps.map((step, index) => <li key={step} className={`rounded-xl px-3 py-3 text-sm font-semibold ${currentStep >= index + 1 ? "bg-purple-deep text-white" : "bg-bg-soft text-text-muted"}`}>{index + 1}. {step}</li>)}
       </ol>
 
@@ -213,7 +220,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         </label>}
         {source !== "custom_list" && <div className="mt-5 grid gap-4 rounded-2xl bg-bg-soft p-4 sm:grid-cols-2"><label className="font-semibold">Gender<select value={gender} onChange={e=>setGender(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"><option value="all">All</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></label><label className="font-semibold">Facility or screening event<input value={facility} onChange={e=>setFacility(e.target.value)} placeholder="Kutunse Screening - Aug 2026" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Group<input value={group} onChange={e=>setGroup(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Tags<input value={tags} onChange={e=>setTags(e.target.value)} placeholder="outreach, follow-up" className="mt-2 w-full rounded-xl border bg-white p-3"/></label><fieldset className="sm:col-span-2"><legend className="font-semibold">Age groups</legend><div className="mt-2 flex flex-wrap gap-2">{AGE_GROUPS.map(item=><label key={item} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm"><input type="checkbox" checked={ageGroups.includes(item)} onChange={e=>setAgeGroups(old=>e.target.checked?[...old,item]:old.filter(x=>x!==item))}/>{item.replaceAll("_","–").replace("65–plus","65+").replace("under–18","Under 18")}</label>)}</div></fieldset><p className="text-sm text-text-muted sm:col-span-2">Only active contacts with valid mobile numbers and SMS consent are included. Opt-outs and do-not-contact records are always excluded.</p></div>}
         {source !== "custom_list" && <AudienceCalculation summary={audienceSummary} loading={audienceLoading} />}
-        <button disabled={busy || audienceLoading || (source === "custom_list" ? !customContacts.trim() : !audienceSummary?.eligible)} onClick={prepareRecipients} className="mt-5 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Preparing contacts…" : "Continue to review message"}</button>
+        <div className="mt-7 rounded-2xl border p-4"><h2 className="text-xl font-semibold">2. Purpose and message</h2><label className="mt-4 block font-semibold">Campaign purpose<select value={purpose} onChange={e=>{const next=e.target.value as CampaignPurpose;setPurpose(next);const template=smsTemplates.find(item=>item.purpose===next);setTemplateId(template?.id??"");setMessageMode(template?"template":"custom");setMessage(template?.message??"");}} className="mt-2 w-full rounded-xl border p-3 sm:max-w-xl">{campaignPurposes.map(item=><option key={item} value={item}>{purposeLabels[item]}</option>)}</select></label><div className="mt-4 flex gap-4"><label><input type="radio" checked={messageMode==="template"} onChange={()=>setMessageMode("template")}/> Use template</label><label><input type="radio" checked={messageMode==="custom"} onChange={()=>{setMessageMode("custom");setTemplateId("")}}/> Write custom message</label></div>{messageMode==="template"&&<select value={templateId} onChange={e=>{setTemplateId(e.target.value);const template=smsTemplates.find(item=>item.id===e.target.value);if(template)setMessage(template.message)}} className="mt-3 w-full rounded-xl border p-3 sm:max-w-xl"><option value="">Choose template</option>{smsTemplates.filter(item=>item.purpose===purpose).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>}<textarea value={message} onChange={e=>setMessage(e.target.value)} rows={5} maxLength={maxSmsCharacters} className="mt-3 w-full rounded-xl border p-3" placeholder={purpose==="feedback_request"?"Include [SURVEY LINK]":"Write the approved message"}/><div className="mt-2 flex flex-wrap gap-4 text-sm"><span>Characters: <strong>{message.length}/{maxSmsCharacters}</strong></span><span>Estimated SMS segments: <strong>{segments}</strong></span><span>Encoding: <strong>{smsEncoding(message)}</strong></span><span>Estimated SMS units: <strong>{(audienceSummary?.eligible??0)*segments}</strong></span></div><p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm">Do not include confidential clinical information, passwords, or sensitive personal data in SMS messages.</p><div className="mt-4 rounded-3xl border-4 border-text-dark bg-white p-4 shadow-sm sm:max-w-sm"><strong>Satellite General Hospital</strong><p className="mt-3 whitespace-pre-wrap text-sm">{previewMessage||"Your message preview will appear here."}</p></div></div>
+        <button disabled={busy || audienceLoading || !message.trim() || (purpose==="feedback_request"&&!message.includes("[SURVEY LINK]")) || (source === "custom_list" ? !customContacts.trim() : !audienceSummary?.eligible)} onClick={prepareRecipients} className="mt-5 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Preparing contacts…" : "Continue to review message"}</button>
       </div> : <>
         <div className="mt-7 flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="text-xl font-semibold">Recipients ready</h2><p className="text-sm text-text-muted">{labels[active.source] ?? active.source}</p></div>
@@ -226,10 +234,14 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
         <div className="mt-7">
           <h2 className="text-xl font-semibold">2. Review message</h2>
-          <label className="mt-3 block font-semibold">Controlled feedback message
-            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={5} disabled={!canEditMessage || busy} className="mt-2 w-full rounded-xl border bg-bg-soft p-3 disabled:opacity-70" />
+          <p className="mt-2 font-semibold">Purpose: {purposeLabels[active.purpose ?? "feedback_request"]}</p>
+          <div className="mt-3 flex gap-4"><label><input type="radio" checked={messageMode==="template"} disabled={!canEditMessage||busy} onChange={()=>setMessageMode("template")}/> Use template</label><label><input type="radio" checked={messageMode==="custom"} disabled={!canEditMessage||busy} onChange={()=>{setMessageMode("custom");setTemplateId("")}}/> Write custom message</label></div>
+          {messageMode==="template"&&<select value={templateId} disabled={!canEditMessage||busy} onChange={e=>{setTemplateId(e.target.value);const template=smsTemplates.find(item=>item.id===e.target.value);if(template)setMessage(template.message)}} className="mt-3 w-full rounded-xl border p-3 sm:max-w-xl"><option value="">Choose template</option>{smsTemplates.filter(item=>item.purpose===(active.purpose??"feedback_request")).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+          <label className="mt-3 block font-semibold">Final SMS message
+            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={5} maxLength={maxSmsCharacters} disabled={!canEditMessage || busy} className="mt-2 w-full rounded-xl border bg-bg-soft p-3 disabled:opacity-70" />
           </label>
-          <p className="mt-2 text-sm text-text-muted">You can edit and save the message until the test SMS is sent. The secure survey link placeholder must remain, and clinical information cannot be added. After testing, the message is locked so the tested text is exactly what will be sent.</p>
+          <div className="mt-2 flex flex-wrap gap-4 text-sm"><span>Characters: <strong>{message.length}/{maxSmsCharacters}</strong></span><span>Estimated SMS segments: <strong>{segments}</strong></span><span>Encoding: <strong>{smsEncoding(message)}</strong></span><span>Estimated SMS units: <strong>{active.queuedCount*segments}</strong></span></div><div className="mt-4 rounded-3xl border-4 border-text-dark bg-white p-4 shadow-sm sm:max-w-sm"><strong>Satellite General Hospital</strong><p className="mt-3 whitespace-pre-wrap text-sm">{previewMessage}</p></div>
+          <p className="mt-2 text-sm text-text-muted">Saving a changed message invalidates the previous test and requires a new one. Feedback requests must retain [SURVEY LINK].</p>
           {canEditMessage && <button disabled={busy || !hasUnsavedMessage} onClick={saveMessage} className="mt-3 min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">Save message</button>}
           {hasUnsavedMessage && <p className="mt-2 text-sm font-semibold text-amber-800">Save your message changes before sending the test SMS.</p>}
         </div>
@@ -265,7 +277,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       <div className="mt-4 space-y-3">
         {!items.length && <p className="rounded-2xl border bg-white p-5">No previous sends yet.</p>}
         {items.map((campaign) => <article key={campaign.code} className="rounded-2xl border bg-white p-5">
-          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p>{campaign.scheduledAt && <p className="mt-1 text-sm font-semibold text-purple-deep">Scheduled: {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(campaign.scheduledAt))}</p>}</div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","scheduled","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div>
+          <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">{campaign.name}</h3><p className="text-sm text-text-muted">{purposeLabels[campaign.purpose??"feedback_request"]} · {labels[campaign.source] ?? campaign.source} · {campaign.status.replaceAll("_", " ")}</p>{campaign.scheduledAt && <p className="mt-1 text-sm font-semibold text-purple-deep">Scheduled: {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(campaign.scheduledAt))}</p>}</div><div className="flex items-center gap-2"><span className="text-sm text-text-muted">{campaign.code}</span>{["ready","test_sent","test_link_opened","test_verified","scheduled","sending"].includes(campaign.status) && <button onClick={()=>resumeCampaign(campaign)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Continue</button>}</div></div><details className="mt-3 rounded-xl bg-bg-soft p-3"><summary className="cursor-pointer font-semibold text-purple-deep">View message</summary><p className="mt-2 whitespace-pre-wrap text-sm">{campaign.message}</p></details>
           {providerMode === "live" && campaign.acceptedCount + campaign.failedCount + campaign.unknownCount > 0 && <button disabled={busy || !canSend} onClick={() => reconcile(campaign)} className="mt-3 rounded-lg border border-purple-deep px-3 py-2 text-sm font-semibold text-purple-deep disabled:opacity-50">Check delivery status</button>}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
             {[["Provider accepted", campaign.acceptedCount], ["Delivered", campaign.deliveredCount], ["Failed", campaign.failedCount], ["Unknown", campaign.unknownCount], ["Delivery rate", `${campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount ? Math.round(campaign.deliveredCount * 100 / (campaign.acceptedCount + campaign.deliveredCount + campaign.failedCount)) : 0}%`]].map(([label, value]) => <div key={String(label)} title={label === "Provider accepted" ? "Arkesel accepted the message; handset delivery is not yet confirmed." : label === "Delivered" ? "Confirmed by Arkesel or the mobile carrier." : label === "Failed" ? "Arkesel or the carrier reported a terminal failure." : label === "Unknown" ? "The outcome cannot safely be determined; the system will not resend automatically." : "Confirmed deliveries divided by accepted, delivered and failed provider outcomes."} className="rounded-xl bg-bg-soft p-3 text-center"><strong className="block text-lg">{value}</strong><small>{label}</small></div>)}

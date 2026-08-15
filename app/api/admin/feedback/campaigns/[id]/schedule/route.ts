@@ -9,6 +9,7 @@ import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
 import { createScheduledSmsTask, deleteScheduledSmsTask, formatAccraSchedule, smsSchedulingEnabled, validateSmsSchedule } from "@/lib/server/sms-scheduler";
 import { getSmsPolicy } from "@/lib/server/sms-settings";
+import { createHash } from "node:crypto";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
@@ -33,6 +34,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (campaign.testVerified !== true || !["test_verified", "scheduled", "cancelled"].includes(String(campaign.status))) return NextResponse.json({ ok: false, message: "Complete and verify the test before scheduling." }, { status: 409 });
+  const currentMessageHash = createHash("sha256").update(String(campaign.message)).digest("hex");
+  if (!campaign.testedMessageHash || campaign.testedMessageHash !== currentMessageHash || (campaign.messageHash && campaign.messageHash !== currentMessageHash)) return NextResponse.json({ ok: false, message: "The current message has not been tested. Complete a new test before scheduling." }, { status: 409 });
   const policy = await getSmsPolicy();
   const validation = validateSmsSchedule(parsed.data.date, parsed.data.time, policy);
   if (!validation.ok) return NextResponse.json({ ok: false, message: validation.message }, { status: 400 });

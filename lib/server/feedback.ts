@@ -5,6 +5,7 @@ import { createReference } from "@/lib/reference";
 import type { FeedbackInput } from "@/lib/validation";
 import { feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
 import { buildSubmissionSearchTerms } from "@/lib/submission-search";
+import { createSubmissionNotification } from "./notifications";
 export function feedbackFlags(data: FeedbackInput) {
   const low =
     data.overallSatisfaction === "very_dissatisfied" ||
@@ -82,6 +83,7 @@ export async function createFeedback(data: FeedbackInput) {
           createdAt: now,
           safeMetadata: { source: data.source },
         });
+        createSubmissionNotification(t, "feedback", ref.id, reference, now, feedbackFlags(data).needsReview ? "important" : "normal");
         if (campaignRef && campaignSnapshot?.exists) {
           const update: Record<string, unknown> = { responseCount: FieldValue.increment(1), updatedAt: now };
           if (testTokenRef) Object.assign(update, feedbackTestVerifiedFields(reference, ref.id, campaignSnapshot.data()?.testLinkOpenedAt, now));

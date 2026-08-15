@@ -7,6 +7,7 @@ import { getSmsProvider } from "@/lib/server/sms";
 import { hasPermission } from "@/lib/types/admin";
 import { smsSchedulingEnabled } from "@/lib/server/sms-scheduler";
 import { getSmsPolicy } from "@/lib/server/sms-settings";
+import { campaignPurposes, type CampaignPurpose } from "@/lib/sms-message";
 
 export default async function Page() {
   const session = await requireAdmin("feedback_campaigns");
@@ -17,6 +18,7 @@ export default async function Page() {
     return {
       code: doc.id, name: String(data.name || "Untitled"), source: String(data.source || "other"),
       message: String(data.message || ""), status: String(data.status || "draft"),
+      purpose: (campaignPurposes.includes(data.purpose as CampaignPurpose) ? data.purpose : "feedback_request") as CampaignPurpose, templateId: String(data.templateId || "patient_feedback"), messageMode: (data.messageMode === "custom" ? "custom" : "template") as "custom" | "template", messageHash: String(data.messageHash || ""), testedMessageHash: String(data.testedMessageHash || ""),
       recipientCount: Number(data.recipientCount || 0), queuedCount: Number(data.queuedCount || 0),
       mockedCount: Number(data.mockedCount || 0), acceptedCount: Number(data.acceptedCount || 0),
       deliveredCount: Number(data.deliveredCount || 0), failedCount: Number(data.failedCount || 0),
@@ -29,11 +31,11 @@ export default async function Page() {
     };
   });
   return <section>
-    <p className="text-sm font-semibold text-pink-accent">PATIENT FEEDBACK</p>
-    <h1 className="text-3xl font-semibold text-purple-deep">Send Feedback SMS</h1>
+    <p className="text-sm font-semibold text-pink-accent">SECURE MESSAGING</p>
+    <h1 className="text-3xl font-semibold text-purple-deep">SMS Campaigns</h1>
     <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-      <strong>Automatic test verification</strong>
-      <p className="mt-2 text-sm">After the test recipient opens the secure link and submits feedback successfully, bulk sending unlocks automatically.</p>
+      <strong>Purpose-aware test verification</strong>
+      <p className="mt-2 text-sm">Feedback requests unlock only after secure feedback submission. Approved non-feedback messages unlock after the provider accepts the exact tested message.</p>
     </div>
     <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} initialSmsPolicy={smsPolicy} />
     {session.role === "super_admin" ? <ConsentMigrationPanel /> : null}

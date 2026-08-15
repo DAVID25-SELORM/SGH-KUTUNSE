@@ -15,6 +15,7 @@ import { verifyScheduledTaskRequest } from "@/lib/server/sms-scheduler";
 import { loadCampaignAudience } from "@/lib/server/campaign-audience";
 import { getSmsPolicy } from "@/lib/server/sms-settings";
 import { isDateWithinSmsPolicy, smsPolicyRestrictionMessage } from "@/lib/sms-policy";
+import { resolveSmsMessage } from "@/lib/sms-message";
 
 export const maxDuration = 300;
 
@@ -73,15 +74,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const testLink = campaignLink(id, String(campaign.source), token);
-    const message = String(campaign.message).replace("[SURVEY LINK]", testLink);
+    const currentMessageHash = createHash("sha256").update(String(campaign.message)).digest("hex");
+    if (campaign.messageHash && campaign.messageHash !== currentMessageHash) return NextResponse.json({ ok: false, message: "The saved message version is invalid. Save it again before testing." }, { status: 409 });
+    const message = resolveSmsMessage(String(campaign.message), testLink);
     const result = await provider.sendMessage(phone, message, `test-${id}-${Date.now()}`);
     if (result.status === "failed") return NextResponse.json({ ok: false, message: "The test SMS was not accepted by Arkesel." }, { status: 502 });
     const batch = adminDb.batch();
     batch.set(adminDb.collection("feedback_test_tokens").doc(tokenHash), { campaignId: id, recipientHash: createHash("sha256").update(phone).digest("hex"), expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), createdAt: FieldValue.serverTimestamp(), openedAt: null, submittedAt: null, used: false });
-    batch.update(ref, { status: "test_sent", testSmsAcceptedAt: FieldValue.serverTimestamp(), testLinkOpenedAt: null, testFeedbackSubmittedAt: null, testVerifiedAt: null, testVerified: false, updatedAt: FieldValue.serverTimestamp() });
+    const feedbackWorkflow = String(campaign.purpose ?? "feedback_request") === "feedback_request";
+    batch.update(ref, { status: feedbackWorkflow ? "test_sent" : "test_verified", testedMessageHash: currentMessageHash, testSmsAcceptedAt: FieldValue.serverTimestamp(), testLinkOpenedAt: null, testFeedbackSubmittedAt: null, testVerifiedAt: feedbackWorkflow ? null : FieldValue.serverTimestamp(), testVerified: !feedbackWorkflow, updatedAt: FieldValue.serverTimestamp() });
     await batch.commit();
     await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
-    return NextResponse.json({ ok: true, status: result.status, mode: provider.mode });
+    return NextResponse.json({ ok: true, status: feedbackWorkflow ? "test_sent" : "test_verified", testVerified: !feedbackWorkflow, mode: provider.mode });
   }
   if (parsed.data.action === "batch" || isScheduled) {
     const currentPolicy = await getSmsPolicy();
@@ -98,7 +102,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const recoveryWindowOpen = campaign.status === "sending" && currentLease instanceof Date && currentLease.getTime() <= Date.now();
   if (campaign.testVerified !== true || (!isScheduled && campaign.status !== "test_verified" && !recoveryWindowOpen))
     return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
-  const message = String(campaign.message).replace("[SURVEY LINK]", campaignLink(id, String(campaign.source)));
+  const currentMessageHash = createHash("sha256").update(String(campaign.message)).digest("hex");
+  if (!campaign.testedMessageHash || campaign.testedMessageHash !== currentMessageHash || (campaign.messageHash && campaign.messageHash !== currentMessageHash)) return NextResponse.json({ ok: false, message: "The current message has not been tested. Send and complete a new test first." }, { status: 409 });
+  const message = resolveSmsMessage(String(campaign.message), String(campaign.purpose ?? "feedback_request") === "feedback_request" ? campaignLink(id, String(campaign.source)) : undefined);
   let recalculated;
   try {
     let allowedContactIds: Set<string> | undefined;

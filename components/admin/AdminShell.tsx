@@ -24,6 +24,7 @@ import {
   type Permission,
 } from "@/lib/types/admin";
 import { LogoutButton } from "./LogoutButton";
+import { AdminNotifications } from "./AdminNotifications";
 const groups: Array<{
   label: string;
   items: Array<{
@@ -118,6 +119,7 @@ const groups: Array<{
   {
     label: "Settings",
     items: [
+      { href: "/admin/notifications", label: "Notifications", icon: MessageSquare },
       { href: "/admin/settings/sms", label: "SMS settings", icon: Settings, permission: "sms_settings_view" },
     ],
   },
@@ -258,6 +260,7 @@ export function AdminShell({
           <p className="text-xs text-text-muted">Secure hospital operations</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <AdminNotifications />
           <Link
             href="/"
             prefetch={false}
