@@ -7,6 +7,28 @@ import { writeAudit } from "@/lib/server/audit";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
 import { parseJson } from "@/lib/server/request";
+import { campaignStatusNoStoreHeaders, campaignVerificationStatus } from "@/lib/feedback-verification-state";
+
+export async function GET() {
+  const actor = await verifyAdminRequest("feedback_campaigns");
+  if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
+  const snapshot = await adminDb.collection("feedback_campaigns").orderBy("createdAt", "desc").limit(50).get();
+  const campaigns = snapshot.docs.map((document) => {
+    const data = document.data();
+    return {
+      code: document.id,
+      ...campaignVerificationStatus(data),
+      recipientCount: Number(data.recipientCount ?? 0),
+      queuedCount: Number(data.queuedCount ?? 0),
+      acceptedCount: Number(data.acceptedCount ?? 0),
+      deliveredCount: Number(data.deliveredCount ?? 0),
+      failedCount: Number(data.failedCount ?? 0),
+      unknownCount: Number(data.unknownCount ?? 0),
+      optedOutCount: Number(data.optedOutCount ?? 0),
+    };
+  });
+  return NextResponse.json({ ok: true, campaigns }, { headers: campaignStatusNoStoreHeaders });
+}
 
 export async function POST(request: Request) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });

@@ -106,8 +106,11 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     if (!active) return;
     await run(async () => {
       const result = await request(`/api/admin/feedback/campaigns/${active.code}/send`, { action: "test", testPhone, confirmation: "SEND TEST" });
+      const status = await request(`/api/admin/feedback/campaigns/${active.code}/status`);
       setTested(true);
-      setActive((current) => current ? { ...current, status: String(result.status), testSmsAccepted: true, testVerified: result.testVerified === true } : current);
+      setActive((current) => current ? mergeCampaignVerificationStatus(current, status) : current);
+      setItems((current) => current.map((campaign) => campaign.code === active.code ? mergeCampaignVerificationStatus(campaign, status) : campaign));
+      return result;
     }, providerMode === "live" ? "Live test SMS accepted by Arkesel. Check the handset and open the survey link." : providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Mock test passed. No real SMS was sent.");
   }
 
@@ -123,16 +126,53 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     }, "Message saved. Send the test SMS to verify this exact message.");
   }
 
+  const refreshCampaignStatuses = useCallback(async () => {
+    try {
+      const result = await request("/api/admin/feedback/campaigns");
+      const statuses = Array.isArray(result.campaigns) ? result.campaigns as Array<{ code: string } & Record<string, unknown>> : [];
+      const byCode = new Map(statuses.map((status) => [status.code, status]));
+      setItems((current) => current.map((campaign) => {
+        const status = byCode.get(campaign.code);
+        return status ? mergeCampaignVerificationStatus(campaign, status) : campaign;
+      }));
+      setActive((current) => {
+        if (!current) return current;
+        const status = byCode.get(current.code);
+        return status ? mergeCampaignVerificationStatus(current, status) : current;
+      });
+    } catch { /* A transient refresh failure must not alter the last authoritative state. */ }
+  }, []);
+
   useEffect(() => {
-    if (!active || !tested || (active.testVerified && active.status !== "sending")) return;
-    const timer = window.setInterval(async () => {
-      try {
-        const status = await request(`/api/admin/feedback/campaigns/${active.code}/status`);
-        setActive((current) => current ? mergeCampaignVerificationStatus(current, status) : current);
-      } catch { /* Keep polling; transient network failures must not change verification state. */ }
+    const initialRefresh = window.setTimeout(refreshCampaignStatuses, 0);
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") void refreshCampaignStatuses(); };
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshCampaignStatuses();
     }, 3000);
+    window.addEventListener("focus", refreshCampaignStatuses);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshCampaignStatuses);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshCampaignStatuses]);
+
+  const activeCode = active?.code;
+  useEffect(() => {
+    if (!activeCode) return;
+    const refreshActive = async () => {
+      try {
+        const status = await request(`/api/admin/feedback/campaigns/${activeCode}/status`);
+        setActive((current) => current ? mergeCampaignVerificationStatus(current, status) : current);
+        setItems((current) => current.map((campaign) => campaign.code === activeCode ? mergeCampaignVerificationStatus(campaign, status) : campaign));
+      } catch { /* Keep polling; transient network failures must not change verification state. */ }
+    };
+    void refreshActive();
+    const timer = window.setInterval(refreshActive, 3000);
     return () => window.clearInterval(timer);
-  }, [active, tested]);
+  }, [activeCode]);
 
   async function sendBulk() {
     if (!active?.testVerified) return;

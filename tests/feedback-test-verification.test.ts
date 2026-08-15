@@ -75,4 +75,10 @@ describe("feedback campaign test verification", () => {
     const polled = mergeCampaignVerificationStatus(locked, { testVerified: true, status: "test_verified" });
     expect(campaignTestActionsEnabled(polled)).toBe(true);
   });
+
+  it("merges provider acceptance into both active and listed campaign state", () => {
+    const campaign = { code: "campaign-1", status: "ready", testSmsAccepted: false, testSendState: "" };
+    const live = mergeCampaignVerificationStatus(campaign, { status: "test_sent", testSmsAccepted: true, testSendState: "accepted" });
+    expect(live).toMatchObject({ code: "campaign-1", status: "test_sent", testSmsAccepted: true, testSendState: "accepted" });
+  });
 });
