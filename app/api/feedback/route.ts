@@ -34,7 +34,23 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("feedback_test_verification", { event: "submission_failed", campaignId: parsed.data.campaign || null, errorClass: error instanceof Error ? error.message : "unknown" });
+    const errorClass = error instanceof Error ? error.message : "unknown";
+    console.error("feedback_test_verification", { event: "submission_failed", campaignId: parsed.data.campaign || null, errorClass });
+    if (errorClass === "FEEDBACK_ALREADY_SUBMITTED")
+      return NextResponse.json(
+        { ok: false, message: "This feedback link has already been used. Your previous response was received; no second submission is needed." },
+        { status: 409 },
+      );
+    if (errorClass === "FEEDBACK_LINK_EXPIRED")
+      return NextResponse.json(
+        { ok: false, message: "This feedback link has expired. Please use the newest link sent by the hospital." },
+        { status: 410 },
+      );
+    if (errorClass === "INVALID_TEST_TOKEN")
+      return NextResponse.json(
+        { ok: false, message: "This secure feedback link is no longer valid. Please use the newest link sent by the hospital." },
+        { status: 400 },
+      );
     return publicError();
   }
 }

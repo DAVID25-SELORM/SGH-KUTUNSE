@@ -43,6 +43,8 @@ export async function createFeedback(data: FeedbackInput) {
           const decision = validateFeedbackTestToken(testTokenSnapshot?.exists ? testTokenSnapshot.data()! : null, verifiedCampaignId);
           if (!decision.ok) {
             console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId || null, reason: decision.reason });
+            if (decision.reason === "token_consumed") throw new Error("FEEDBACK_ALREADY_SUBMITTED");
+            if (decision.reason === "token_expired") throw new Error("FEEDBACK_LINK_EXPIRED");
             throw new Error("INVALID_TEST_TOKEN");
           }
           verifiedCampaignId = decision.campaignId;

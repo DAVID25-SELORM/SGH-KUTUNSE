@@ -79,11 +79,13 @@ export function FeedbackForm({ initialTracking }: { initialTracking: { campaign:
         body: JSON.stringify(data),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error();
+      if (!r.ok) throw new Error(typeof j.message === "string" ? j.message : "");
       setReference(j.reference);
-    } catch {
+    } catch (error) {
       setServerError(
-        "Your feedback could not be saved. Your answers remain on this page; please try again.",
+        error instanceof Error && error.message
+          ? error.message
+          : "Your feedback could not be saved. Your answers remain on this page; please try again.",
       );
     }
   }
