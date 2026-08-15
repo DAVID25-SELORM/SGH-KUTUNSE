@@ -71,8 +71,18 @@ const groups: Array<{
         icon: Stethoscope,
         permission: "telemedicine",
       },
-      { href: "/admin/feedback", label: "Patient feedback", icon: MessageSquare, permission: "feedback" },
-      { href: "/admin/contacts", label: "Contacts", icon: Users, permission: "contacts" },
+      {
+        href: "/admin/feedback",
+        label: "Patient feedback",
+        icon: MessageSquare,
+        permission: "feedback",
+      },
+      {
+        href: "/admin/contacts",
+        label: "Contacts",
+        icon: Users,
+        permission: "contacts",
+      },
     ],
   },
   {
@@ -119,8 +129,17 @@ const groups: Array<{
   {
     label: "Settings",
     items: [
-      { href: "/admin/notifications", label: "Notifications", icon: MessageSquare },
-      { href: "/admin/settings/sms", label: "SMS settings", icon: Settings, permission: "sms_settings_view" },
+      {
+        href: "/admin/notifications",
+        label: "Notifications",
+        icon: MessageSquare,
+      },
+      {
+        href: "/admin/settings/sms",
+        label: "SMS settings",
+        icon: Settings,
+        permission: "sms_settings_view",
+      },
     ],
   },
   {
@@ -244,22 +263,22 @@ export function AdminShell({
     </nav>
   );
   return (
-    <div className="min-h-screen bg-neutral-light">
-      <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border-default bg-white px-4 min-[900px]:pl-[276px]">
+    <div className="min-h-screen overflow-x-hidden bg-neutral-light">
+      <header className="sticky top-0 z-40 flex h-16 min-w-0 items-center border-b border-border-default bg-white px-2 sm:px-4 min-[900px]:pl-[276px]">
         <button
           onClick={() => setOpen(true)}
-          className="mr-3 grid h-11 w-11 place-items-center rounded-xl hover:bg-bg-soft min-[900px]:hidden"
+          className="mr-1 grid h-11 w-11 shrink-0 place-items-center rounded-xl hover:bg-bg-soft sm:mr-3 min-[900px]:hidden"
           aria-label="Open admin navigation"
           aria-expanded={open}
           aria-controls="admin-mobile-navigation"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div>
+        <div className="hidden min-w-0 min-[390px]:block">
           <p className="font-bold text-purple-deep">SGH Administration</p>
           <p className="text-xs text-text-muted">Secure hospital operations</p>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3">
           <AdminNotifications />
           <Link
             href="/"
@@ -270,7 +289,9 @@ export function AdminShell({
           </Link>
           <div className="hidden max-w-56 text-right md:block">
             <p className="truncate text-sm font-semibold">{email}</p>
-            <p className="text-xs text-text-muted">{roles.map(roleName).join(", ")}</p>
+            <p className="text-xs text-text-muted">
+              {roles.map(roleName).join(", ")}
+            </p>
           </div>
           <LogoutButton />
         </div>
@@ -311,7 +332,10 @@ export function AdminShell({
           </aside>
         </div>
       )}
-      <main id="main-content" className="min-w-0 p-4 sm:p-6 min-[900px]:ml-64 min-[900px]:p-8">
+      <main
+        id="main-content"
+        className="min-w-0 overflow-x-hidden p-3 sm:p-6 min-[900px]:ml-64 min-[900px]:p-8"
+      >
         {children}
       </main>
     </div>
