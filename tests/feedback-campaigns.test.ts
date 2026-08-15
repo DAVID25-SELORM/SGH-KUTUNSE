@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { campaignCreateSchema, campaignLink, defaultFeedbackMessage, parseRecipientImport, recipientKey } from "@/lib/feedback-campaigns";
+import { campaignCreateSchema, campaignLink, campaignMessageSchema, canEditCampaignMessage, defaultFeedbackMessage, parseRecipientImport, recipientKey } from "@/lib/feedback-campaigns";
 import { MockSmsProvider } from "@/lib/sms";
 import { ArkeselSmsProvider } from "@/lib/server/sms";
 describe("feedback campaigns",()=>{
  it("normalizes and deduplicates",()=>{const r=parseRecipientImport("0241234567, +233241234567\ninvalid");expect(r.recipients).toEqual(["+233241234567"]);expect(r.invalidCount).toBe(1);expect(r.duplicateCount).toBe(1)});
  it("uses stable opaque keys",()=>{expect(recipientKey("+233241234567")).toBe(recipientKey("+233241234567"));expect(recipientKey("+233241234567")).not.toContain("241234567")});
  it("requires a safe template",()=>{expect(campaignCreateSchema.safeParse({name:"OPD feedback",source:"outpatient",message:defaultFeedbackMessage}).success).toBe(true);expect(campaignCreateSchema.safeParse({name:"OPD feedback",source:"outpatient",message:"Your diagnosis is ready [SURVEY LINK]"}).success).toBe(false)});
+ it("validates edited messages with the same safety controls",()=>{expect(campaignMessageSchema.safeParse({message:`${defaultFeedbackMessage} Thank you.`}).success).toBe(true);expect(campaignMessageSchema.safeParse({message:"Thank you for visiting our hospital."}).success).toBe(false);expect(campaignMessageSchema.safeParse({message:"Your medication information is available here: [SURVEY LINK]"}).success).toBe(false)});
+ it("allows edits only before a test SMS is accepted",()=>{expect(canEditCampaignMessage({status:"draft"})).toBe(true);expect(canEditCampaignMessage({status:"ready"})).toBe(true);expect(canEditCampaignMessage({status:"ready",testSmsAccepted:true})).toBe(false);expect(canEditCampaignMessage({status:"test_sent"})).toBe(false);expect(canEditCampaignMessage({status:"test_verified",testVerified:true})).toBe(false);expect(canEditCampaignMessage({status:"scheduled"})).toBe(false)});
  it("supports an all-contacts campaign source",()=>{expect(campaignCreateSchema.safeParse({name:"All contacts feedback",source:"all_contacts",message:defaultFeedbackMessage}).success).toBe(true)});
  it("supports a staff campaign source",()=>{expect(campaignCreateSchema.safeParse({name:"Staff feedback",source:"staff",message:defaultFeedbackMessage}).success).toBe(true)});
  it("creates non-identifying links",()=>{const link=campaignLink("opaque-code","health_screening");expect(link).toContain("campaign=opaque-code");expect(link).not.toMatch(/phone|patient/i)});

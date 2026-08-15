@@ -24,9 +24,9 @@ const labels: Record<string, string> = {
   laboratory: "Laboratory", pharmacy: "Pharmacy", custom_list: "Custom list", other: "Other",
 };
 
-async function request(url: string, body?: unknown) {
+async function request(url: string, body?: unknown, method: "POST" | "PATCH" = "POST") {
   const response = await fetch(url, body === undefined ? { cache: "no-store" } : {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "The request could not be completed.");
@@ -105,6 +105,17 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     }, providerMode === "live" ? "Live test SMS accepted by Arkesel. Check the handset and open the survey link." : providerMode === "sandbox" ? "Sandbox test passed. No SMS was delivered to a handset." : "Mock test passed. No real SMS was sent.");
   }
 
+  async function saveMessage() {
+    if (!active) return;
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}`, { message }, "PATCH");
+      const savedMessage = String(result.message);
+      setMessage(savedMessage);
+      setActive((current) => current ? { ...current, message: savedMessage } : current);
+      setItems((old) => old.map((item) => item.code === active.code ? { ...item, message: savedMessage } : item));
+    }, "Message saved. Send the test SMS to verify this exact message.");
+  }
+
   useEffect(() => {
     if (!active || !tested || (active.testVerified && active.status !== "sending")) return;
     const timer = window.setInterval(async () => {
@@ -153,7 +164,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   }
 
   async function resumeCampaign(campaign: Campaign) {
-    setActive(campaign); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
+    setActive(campaign); setMessage(campaign.message); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
     if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
@@ -167,10 +178,12 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function reset() { setActive(null); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
+  function reset() { setActive(null); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
 
   const steps = ["Audience", "Message", "Test", "Send", "Results"];
   const currentStep = !active ? 1 : !tested ? 2 : !active.testVerified ? 3 : active.status === "completed" ? 5 : 4;
+  const canEditMessage = Boolean(active && ["draft", "ready"].includes(active.status) && !active.testSmsAccepted && !active.testVerified);
+  const hasUnsavedMessage = Boolean(active && message !== active.message);
 
   return <div className="mt-6 space-y-8">
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm"><div><p className="text-sm font-semibold text-text-muted">SMS Sending Policy</p><strong className="text-lg text-purple-deep">{smsPolicyLabel(smsPolicy)}</strong></div><Link href="/admin/settings/sms" className="font-semibold text-purple-deep">Manage SMS Settings</Link></section>
@@ -214,15 +227,17 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         <div className="mt-7">
           <h2 className="text-xl font-semibold">2. Review message</h2>
           <label className="mt-3 block font-semibold">Controlled feedback message
-            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={5} disabled className="mt-2 w-full rounded-xl border bg-bg-soft p-3" />
+            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={5} disabled={!canEditMessage || busy} className="mt-2 w-full rounded-xl border bg-bg-soft p-3 disabled:opacity-70" />
           </label>
-          <p className="mt-2 text-sm text-text-muted">The secure survey link is inserted automatically. Clinical information cannot be added.</p>
+          <p className="mt-2 text-sm text-text-muted">You can edit and save the message until the test SMS is sent. The secure survey link placeholder must remain, and clinical information cannot be added. After testing, the message is locked so the tested text is exactly what will be sent.</p>
+          {canEditMessage && <button disabled={busy || !hasUnsavedMessage} onClick={saveMessage} className="mt-3 min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">Save message</button>}
+          {hasUnsavedMessage && <p className="mt-2 text-sm font-semibold text-amber-800">Save your message changes before sending the test SMS.</p>}
         </div>
 
         <div className="mt-7">
           <h2 className="text-xl font-semibold">3. Test</h2>
           <p className="mt-1 text-sm text-text-muted">Confirm the message workflow using one authorised Ghana number.</p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Test phone number" className="min-h-11 rounded-xl border p-3 sm:w-80" /><button disabled={busy || !canSend || !testPhone.trim() || active.testSmsAccepted} onClick={sendTest} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">{active.testVerified ? "Test Verified" : active.testSmsAccepted ? "Test SMS Sent" : "Send Test SMS"}</button></div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Test phone number" className="min-h-11 rounded-xl border p-3 sm:w-80" /><button disabled={busy || !canSend || !testPhone.trim() || active.testSmsAccepted || hasUnsavedMessage} onClick={sendTest} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">{active.testVerified ? "Test Verified" : active.testSmsAccepted ? "Test SMS Sent" : "Send Test SMS"}</button></div>
           {!canSend && <p className="mt-2 text-sm text-red-700">Your administrator role does not have permission to test or send SMS.</p>}
         </div>
 
