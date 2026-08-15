@@ -69,5 +69,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   batch.set(campaignRef, { status: "ready", recipientCount: FieldValue.increment(added), queuedCount: FieldValue.increment(added - optedOut), optedOutCount: FieldValue.increment(optedOut), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await batch.commit();
   await writeAudit(actor.uid, "feedback_campaign.recipients_imported", "feedback_campaign", id, { added: String(added), duplicates: String(existingCount + imported.duplicateCount), invalid: String(imported.invalidCount), optedOut: String(optedOut) });
-  return NextResponse.json({ ok: true, added, duplicateCount: existingCount + imported.duplicateCount, invalidCount: imported.invalidCount, optedOut });
+  return NextResponse.json({ ok: true, added, queued: added - optedOut, duplicateCount: existingCount + imported.duplicateCount, invalidCount: imported.invalidCount, optedOut });
 }
