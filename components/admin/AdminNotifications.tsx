@@ -72,9 +72,9 @@ export function AdminNotifications() {
   }, [playNewNotificationOnce]);
   useEffect(() => {
     const audio = new Audio("/notification-tone.wav"); audio.preload = "auto"; audio.volume = 0.45; audioRef.current = audio;
-    const enabled = localStorage.getItem(soundKey) === "on"; soundRef.current = enabled; setSound(enabled);
+    const enabled = localStorage.getItem(soundKey) === "on"; soundRef.current = enabled;
     diagnostic(enabled ? "notification sound enabled" : "notification sound disabled");
-    const initial = window.setTimeout(() => void load(), 0);
+    const initial = window.setTimeout(() => { setSound(enabled); void load(); }, 0);
     const timer = window.setInterval(() => void load(), 3000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); audio.pause(); audioRef.current = null; };
   }, [load]);

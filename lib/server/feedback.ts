@@ -68,6 +68,7 @@ export async function createFeedback(data: FeedbackInput) {
         t.create(ref, {
           ...safe,
           ...(verifiedCampaignId ? { campaign: verifiedCampaignId } : {}),
+          ...(testTokenHash ? { testTokenHash } : {}),
           ...feedbackFlags(data),
           reference,
           searchTerms: buildSubmissionSearchTerms({ ...safe, campaign: verifiedCampaignId, reference }),

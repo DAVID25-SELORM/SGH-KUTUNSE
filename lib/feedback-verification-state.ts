@@ -13,6 +13,14 @@ export function campaignTestActionsEnabled(status: { testVerified?: unknown }) {
   return status.testVerified === true;
 }
 
+export function campaignHasTestAttempt(status: { status?: unknown; testSmsAccepted?: unknown; testSendState?: unknown }) {
+  return Boolean(status.testSmsAccepted) || ["sending", "delivery_unknown", "accepted"].includes(String(status.testSendState ?? "")) || ["test_sending", "test_delivery_unknown", "test_sent", "test_link_opened", "test_verified"].includes(String(status.status ?? ""));
+}
+
+export function isRestorableCampaignStatus(status: unknown) {
+  return ["ready", "test_sending", "test_delivery_unknown", "test_sent", "test_link_opened", "test_verified", "scheduled", "sending"].includes(String(status ?? ""));
+}
+
 export function mergeCampaignVerificationStatus<T extends object>(current: T, status: object) {
   return { ...current, ...status };
 }

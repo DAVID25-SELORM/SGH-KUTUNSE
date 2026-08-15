@@ -88,7 +88,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const freshMessageHash = createHash("sha256").update(String(data.message ?? "")).digest("hex");
       if (freshMessageHash !== currentMessageHash || (data.messageHash && data.messageHash !== freshMessageHash)) return false;
       transaction.create(tokenRef, { campaignId: id, attemptId, recipientHash: createHash("sha256").update(phone).digest("hex"), expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), createdAt: FieldValue.serverTimestamp(), openedAt: null, submittedAt: null, used: false });
-      transaction.update(ref, { status: "test_sending", testSendState: "sending", testSendAttemptId: attemptId, testSendStartedAt: FieldValue.serverTimestamp(), testedMessageHash: currentMessageHash, updatedAt: FieldValue.serverTimestamp() });
+      transaction.update(ref, { status: "test_sending", testSendState: "sending", testSendAttemptId: attemptId, testTokenHash: tokenHash, testSendStartedAt: FieldValue.serverTimestamp(), testedMessageHash: currentMessageHash, updatedAt: FieldValue.serverTimestamp() });
       return true;
     });
     if (!reserved) return NextResponse.json({ ok: false, message: "A Test SMS is already in progress or was already accepted. Do not send it again." }, { status: 409 });

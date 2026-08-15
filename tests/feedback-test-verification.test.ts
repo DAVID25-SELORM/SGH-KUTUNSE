@@ -7,12 +7,15 @@ import {
   feedbackTrackingFromSearchParams,
   hashFeedbackTestToken,
   validateFeedbackTestToken,
+  validateCompletedFeedbackTest,
 } from "@/lib/feedback-test-verification";
 import {
+  campaignHasTestAttempt,
   campaignStatusNoStoreHeaders,
   campaignTestActionsEnabled,
   campaignVerificationStatus,
   mergeCampaignVerificationStatus,
+  isRestorableCampaignStatus,
 } from "@/lib/feedback-verification-state";
 
 const now = new Date("2026-08-15T04:00:00.000Z");
@@ -80,5 +83,33 @@ describe("feedback campaign test verification", () => {
     const campaign = { code: "campaign-1", status: "ready", testSmsAccepted: false, testSendState: "" };
     const live = mergeCampaignVerificationStatus(campaign, { status: "test_sent", testSmsAccepted: true, testSendState: "accepted" });
     expect(live).toMatchObject({ code: "campaign-1", status: "test_sent", testSmsAccepted: true, testSendState: "accepted" });
+  });
+
+  it("validates a completed campaign-bound test without trusting an admin click", () => {
+    const messageHash = hashFeedbackTestToken("saved message");
+    const campaign = { testSendAttemptId: "attempt-1", message: "saved message", messageHash, testedMessageHash: messageHash, testLinkOpenedAt: now };
+    const token = { campaignId: "campaign-1", openedAt: now, submittedAt: now, expiresAt: new Date("2026-08-16T04:00:00.000Z"), used: true, feedbackId: "feedback-1" };
+    const feedback = { id: "feedback-1", campaign: "campaign-1", reference: "SGH-FBK-TEST", testTokenHash: "token-hash" };
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, token, feedback, "token-hash")).toEqual({ ok: true, feedbackId: "feedback-1", reference: "SGH-FBK-TEST" });
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, token, feedback, "token-hash")).toEqual({ ok: true, feedbackId: "feedback-1", reference: "SGH-FBK-TEST" });
+  });
+
+  it("rejects incomplete, wrong, expired, unrelated, and message-edited confirmations", () => {
+    const messageHash = hashFeedbackTestToken("saved message");
+    const campaign = { testSendAttemptId: "attempt-1", message: "saved message", messageHash, testedMessageHash: messageHash, testLinkOpenedAt: now };
+    const token = { campaignId: "campaign-1", openedAt: now, submittedAt: now, expiresAt: new Date("2026-08-16T04:00:00.000Z"), used: true, feedbackId: "feedback-1" };
+    const feedback = { id: "feedback-1", campaign: "campaign-1", reference: "SGH-FBK-TEST" };
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, { ...token, submittedAt: null, used: false }, null)).toMatchObject({ ok: false, reason: "feedback_not_submitted" });
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, { ...token, campaignId: "other" }, feedback)).toMatchObject({ ok: false, reason: "campaign_mismatch" });
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, { ...token, expiresAt: new Date("2026-08-14T04:00:00.000Z") }, feedback)).toMatchObject({ ok: false, reason: "token_expired" });
+    expect(validateCompletedFeedbackTest("campaign-1", campaign, token, { ...feedback, campaign: "other" })).toMatchObject({ ok: false, reason: "feedback_mismatch" });
+    expect(validateCompletedFeedbackTest("campaign-1", { ...campaign, message: "edited message" }, token, feedback)).toMatchObject({ ok: false, reason: "message_changed" });
+  });
+
+  it("restores persisted test progress after refresh", () => {
+    expect(isRestorableCampaignStatus("test_sent")).toBe(true);
+    expect(campaignHasTestAttempt({ status: "test_delivery_unknown", testSendState: "delivery_unknown" })).toBe(true);
+    expect(campaignHasTestAttempt({ status: "test_verified", testSmsAccepted: true })).toBe(true);
+    expect(isRestorableCampaignStatus("completed")).toBe(false);
   });
 });

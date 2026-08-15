@@ -6,6 +6,41 @@ export type FeedbackTestTokenRecord = {
   used?: unknown;
 };
 
+export type CompletedFeedbackTestDecision =
+  | { ok: true; feedbackId: string; reference: string }
+  | { ok: false; reason: "test_not_sent" | "token_not_found" | "campaign_mismatch" | "link_not_opened" | "feedback_not_submitted" | "token_expired" | "feedback_not_found" | "feedback_mismatch" | "message_changed" };
+
+function timestampDate(value: unknown) {
+  if (value instanceof Date) return value;
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") return value.toDate() as Date;
+  return null;
+}
+
+export function validateCompletedFeedbackTest(
+  campaignId: string,
+  campaign: Record<string, unknown>,
+  token: Record<string, unknown> | null,
+  feedback: (Record<string, unknown> & { id: string }) | null,
+  tokenHash = "",
+): CompletedFeedbackTestDecision {
+  if (!campaign.testSendAttemptId && !campaign.testSmsAcceptedAt && !["sending", "delivery_unknown", "accepted"].includes(String(campaign.testSendState ?? ""))) return { ok: false, reason: "test_not_sent" };
+  if (!token) return { ok: false, reason: "token_not_found" };
+  if (token.campaignId !== campaignId) return { ok: false, reason: "campaign_mismatch" };
+  if (!timestampDate(token.openedAt) && !timestampDate(campaign.testLinkOpenedAt)) return { ok: false, reason: "link_not_opened" };
+  const submittedAt = timestampDate(token.submittedAt);
+  const feedbackId = typeof token.feedbackId === "string" ? token.feedbackId : "";
+  if (token.used !== true || !submittedAt || !feedbackId) return { ok: false, reason: "feedback_not_submitted" };
+  const expiresAt = timestampDate(token.expiresAt);
+  if (!expiresAt || submittedAt.getTime() > expiresAt.getTime()) return { ok: false, reason: "token_expired" };
+  if (!feedback) return { ok: false, reason: "feedback_not_found" };
+  if (feedback.id !== feedbackId || feedback.campaign !== campaignId || (feedback.testTokenHash && feedback.testTokenHash !== tokenHash)) return { ok: false, reason: "feedback_mismatch" };
+  const currentHash = createHash("sha256").update(String(campaign.message ?? "")).digest("hex");
+  if (!campaign.testedMessageHash || campaign.testedMessageHash !== currentHash || (campaign.messageHash && campaign.messageHash !== currentHash)) return { ok: false, reason: "message_changed" };
+  const reference = typeof feedback.reference === "string" ? feedback.reference : "";
+  if (!reference) return { ok: false, reason: "feedback_mismatch" };
+  return { ok: true, feedbackId, reference };
+}
+
 export type FeedbackTestTokenDecision =
   | { ok: true; campaignId: string }
   | { ok: false; reason: "token_not_found" | "token_consumed" | "token_expired" | "campaign_mismatch" | "campaign_missing" };

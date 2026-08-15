@@ -5,7 +5,7 @@ import { campaignSources, defaultFeedbackMessage, parseRecipientImport } from "@
 import { AGE_GROUPS } from "@/lib/contacts";
 import Link from "next/link";
 import { isDateWithinSmsPolicy, isTimeWithinSmsPolicy, smsPolicyLabel, type SmsPolicy } from "@/lib/sms-policy";
-import { mergeCampaignVerificationStatus } from "@/lib/feedback-verification-state";
+import { campaignHasTestAttempt, isRestorableCampaignStatus, mergeCampaignVerificationStatus } from "@/lib/feedback-verification-state";
 import { campaignPurposes, maxSmsCharacters, purposeConsentScope, purposeLabels, resolveMessagePreview, smsEncoding, smsSegmentCount, smsTemplates, type CampaignPurpose } from "@/lib/sms-message";
 
 type Campaign = {
@@ -20,6 +20,7 @@ type Campaign = {
 };
 type AudienceSummary = { totalContacts: number; filterMatches: number; active: number; validMobile: number; smsConsent: number; eligible: number; noConsent: number; invalidPhone: number; optedOut: number; doNotContact: number; duplicates: number; otherExclusions: number };
 type Preparation = AudienceSummary & { added: number; queued: number; existingCampaignRecipients: number };
+const activeCampaignKey = "sgh-active-feedback-campaign";
 
 const labels: Record<string, string> = {
   all_contacts: "All contacts", staff: "Staff", health_screening: "Health screening",
@@ -63,12 +64,22 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [deliveryOption, setDeliveryOption] = useState<"now" | "schedule">("now");
   const [scheduleDate, setScheduleDate] = useState(""), [scheduleTime, setScheduleTime] = useState("");
   const [editingSchedule, setEditingSchedule] = useState(false);
+  const [sendControlsRevealed, setSendControlsRevealed] = useState(false);
   const [smsPolicy, setSmsPolicy] = useState(initialSmsPolicy);
   const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
 
   useEffect(() => {
     fetch("/api/admin/settings/sms").then(response => response.ok ? response.json() : null).then(data => { if (data?.policy) setSmsPolicy(data.policy); }).catch(() => { /* Server validation remains authoritative if refresh fails. */ });
   }, []);
+
+  useEffect(() => {
+    const restore = window.setTimeout(() => {
+      const campaign = initialCampaigns.find((item) => item.code === localStorage.getItem(activeCampaignKey));
+      if (!campaign || !isRestorableCampaignStatus(campaign.status)) return;
+      setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(campaignHasTestAttempt(campaign)); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now");
+    }, 0);
+    return () => window.clearTimeout(restore);
+  }, [initialCampaigns]);
 
   async function run<T>(work: () => Promise<T>, success?: string) {
     setBusy(true); setNotice("");
@@ -96,6 +107,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
         : await request(`/api/admin/feedback/campaigns/${created.code}/recipients/all`, {});
       const summary: Preparation = { ...prepared, added: Number(prepared.added ?? 0), queued: Number(prepared.queued ?? 0), existingCampaignRecipients: Number(prepared.existingCampaignRecipients ?? 0) };
       const ready = { ...campaign, status: "ready", recipientCount: summary.added, queuedCount: summary.queued, optedOutCount: summary.optedOut };
+      localStorage.setItem(activeCampaignKey, ready.code);
       setActive(ready); setPreparation(summary); setItems((old) => [ready, ...old]); setTested(false);
       return ready;
     }, "Recipients prepared securely. Review the message, then send a test.");
@@ -124,6 +136,17 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       setItems((old) => old.map((item) => item.code === active.code ? { ...item, message: savedMessage, purpose, templateId, messageMode, status: "ready", testSmsAccepted: false, testVerified: false } : item));
       setTested(false);
     }, "Message saved. Send the test SMS to verify this exact message.");
+  }
+
+  async function confirmTestComplete() {
+    if (!active) return;
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/verify-test`, {});
+      const status = result.status ?? await request(`/api/admin/feedback/campaigns/${active.code}/status`);
+      setActive((current) => current ? mergeCampaignVerificationStatus(current, status) : current);
+      setItems((current) => current.map((campaign) => campaign.code === active.code ? mergeCampaignVerificationStatus(campaign, status) : campaign));
+      setTested(true);
+    }, "Test verified from the secure feedback submission. Continue to choose how to send.");
   }
 
   const refreshCampaignStatuses = useCallback(async () => {
@@ -211,7 +234,8 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   }
 
   async function resumeCampaign(campaign: Campaign) {
-    setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(Boolean(campaign.testSmsAccepted)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false);
+    localStorage.setItem(activeCampaignKey, campaign.code);
+    setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(campaignHasTestAttempt(campaign)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false); setSendControlsRevealed(false);
     if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
@@ -225,10 +249,11 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function reset() { setActive(null); setPurpose("feedback_request"); setTemplateId("patient_feedback"); setMessageMode("template"); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); }
+  function reset() { localStorage.removeItem(activeCampaignKey); setActive(null); setPurpose("feedback_request"); setTemplateId("patient_feedback"); setMessageMode("template"); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); setSendControlsRevealed(false); }
 
   const steps = ["Audience", "Purpose", "Message", "Preview", "Test", "Send / Schedule", "Results"];
-  const currentStep = !active ? 1 : !tested ? 4 : !active.testVerified ? 5 : active.status === "completed" ? 7 : 6;
+  const hasTestAttempt = active ? campaignHasTestAttempt(active) : tested;
+  const currentStep = !active ? 1 : !hasTestAttempt ? 4 : !active.testVerified ? 5 : active.status === "completed" ? 7 : 6;
   const canEditMessage = Boolean(active && ["draft", "ready", "test_sent", "test_link_opened", "test_verified"].includes(active.status));
   const hasUnsavedMessage = Boolean(active && (message !== active.message || purpose !== (active.purpose ?? "feedback_request") || templateId !== (active.templateId ?? "patient_feedback") || messageMode !== (active.messageMode ?? "template")));
   const segments = smsSegmentCount(message); const previewMessage = resolveMessagePreview(message);
@@ -306,10 +331,14 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
             <li>{active.testVerified ? "✅ Test verified — Bulk SMS is ready" : "○ Waiting for successful test feedback submission"}</li>
           </ul>
           <p className={`mt-4 font-semibold ${active.testVerified ? "text-emerald-800" : "text-amber-800"}`}>{active.testVerified ? "Ready to Send" : "Bulk sending is locked until the test is verified."}</p>
+          {hasTestAttempt && !active.testVerified && <div className="mt-4 rounded-xl bg-white p-4"><button disabled={busy || !canSend || hasUnsavedMessage} onClick={confirmTestComplete} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">I’ve completed the test</button><p className="mt-2 text-sm text-text-muted">This securely re-checks the latest test link and feedback submission. It cannot manually approve or bypass verification.</p></div>}
+          {active.testVerified && !sendControlsRevealed && <button type="button" onClick={() => setSendControlsRevealed(true)} className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white">Continue to Send</button>}
           {active.testVerified && <div className="mt-4 rounded-2xl border border-emerald-300 bg-white p-4"><strong className="text-lg text-emerald-800">{active.queuedCount} recipients ready</strong><p className="mt-1 text-sm">Message tested and verified. Choose how you want to send it.</p><dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div><dt className="text-text-muted">Excluded</dt><dd className="font-semibold">{finalExclusions}</dd></div><div><dt className="text-text-muted">SMS segments</dt><dd className="font-semibold">{segments}</dd></div><div><dt className="text-text-muted">Estimated total units</dt><dd className="font-semibold">{active.queuedCount*segments}</dd></div></dl><div className="mt-3 rounded-xl bg-bg-soft p-3"><strong>Exact message preview</strong><p className="mt-1 whitespace-pre-wrap text-sm">{previewMessage}</p></div></div>}
+          {sendControlsRevealed && <>
           {active.testVerified && active.status !== "scheduled" && <fieldset className="mt-4"><legend className="font-semibold">Choose delivery method</legend><div className="mt-2 flex flex-wrap gap-3"><button type="button" onClick={()=>setDeliveryOption("now")} className={`rounded-xl border px-5 py-3 font-semibold ${deliveryOption==="now"?"bg-purple-deep text-white":"bg-white text-purple-deep"}`}>Send Now</button><button type="button" onClick={()=>setDeliveryOption("schedule")} disabled={!schedulingEnabled} className={`rounded-xl border px-5 py-3 font-semibold disabled:opacity-50 ${deliveryOption==="schedule"?"bg-purple-deep text-white":"bg-white text-purple-deep"}`}>Schedule for Later</button></div>{!schedulingEnabled && <p className="mt-2 text-sm text-amber-800">Scheduling becomes available after the secure Cloud Tasks queue and service identity are configured.</p>}</fieldset>}
           {deliveryOption === "schedule" && (active.status !== "scheduled" || editingSchedule) && <div className="mt-4"><p className="mb-3 rounded-xl bg-white p-3 text-sm"><strong>Hospital SMS sending window</strong><br/>{smsPolicyLabel(smsPolicy)}</p><div className="grid gap-3 sm:grid-cols-2"><label className="font-semibold">Date<input type="date" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label><label className="font-semibold">Time (Ghana time / GMT)<input type="time" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)} className="mt-2 w-full rounded-xl border bg-white p-3"/></label></div></div>}
           {active.status === "scheduled" && !editingSchedule ? <div className="mt-4 rounded-xl border border-purple-deep bg-white p-4"><strong>Scheduled</strong><p>{active.scheduledAt ? new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(active.scheduledAt)) : "Time unavailable"} (Ghana time / GMT)</p>{active.scheduledAt && !isDateWithinSmsPolicy(new Date(active.scheduledAt), smsPolicy) && <p className="mt-2 rounded-lg bg-amber-50 p-3 font-semibold text-amber-900">This campaign is scheduled outside the hospital’s current SMS sending hours and will not execute unless rescheduled or the policy changes.</p>}{active.scheduledByName && <p className="text-sm">Scheduled by: {active.scheduledByName}</p>}<p className="text-sm text-text-muted">The final eligible audience and current SMS policy will be checked again before delivery.</p><div className="mt-3 flex gap-2"><button onClick={()=>{setDeliveryOption("schedule"); setEditingSchedule(true);}} className="rounded-xl border px-4 py-2 font-semibold">Reschedule</button><button onClick={cancelSchedule} className="rounded-xl border border-red-700 px-4 py-2 font-semibold text-red-700">Cancel scheduled send</button></div></div> : deliveryOption === "schedule" ? <button disabled={busy || !active.testVerified || !canSend || !scheduleDate || !scheduleTime || !schedulingEnabled || !isTimeWithinSmsPolicy(scheduleTime, smsPolicy)} onClick={()=>scheduleCampaign(active.scheduledAt ? "reschedule" : "schedule")} className="mt-3 min-h-12 rounded-xl bg-purple-deep px-6 py-3 font-semibold text-white disabled:opacity-50">{active.scheduledAt ? "Save new schedule" : `Schedule SMS to ${active.queuedCount} Recipients`}</button> : <button disabled={busy || !active.testVerified || !canSend || active.queuedCount < 1} onClick={sendBulk} className="mt-3 min-h-12 rounded-xl bg-pink-accent px-6 py-3 font-semibold text-white shadow-sm disabled:opacity-50">Confirm Send Now to {active.queuedCount} Recipients</button>}
+          </>}
         </div>
       </>}
     </section>
