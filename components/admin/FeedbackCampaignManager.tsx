@@ -65,6 +65,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
   const [scheduleDate, setScheduleDate] = useState(""), [scheduleTime, setScheduleTime] = useState("");
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [sendControlsRevealed, setSendControlsRevealed] = useState(false);
+  const [replacementTestLink, setReplacementTestLink] = useState("");
   const [smsPolicy, setSmsPolicy] = useState(initialSmsPolicy);
   const [gender,setGender]=useState("all"),[ageGroups,setAgeGroups]=useState<string[]>([]),[facility,setFacility]=useState(""),[group,setGroup]=useState(""),[tags,setTags]=useState(""),[recentDays,setRecentDays]=useState("30");
 
@@ -147,6 +148,15 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
       setItems((current) => current.map((campaign) => campaign.code === active.code ? mergeCampaignVerificationStatus(campaign, status) : campaign));
       setTested(true);
     }, "Test verified from the secure feedback submission. Continue to choose how to send.");
+  }
+
+  async function replaceTestLink() {
+    if (!active) return;
+    await run(async () => {
+      const result = await request(`/api/admin/feedback/campaigns/${active.code}/replace-test-link`, {});
+      setReplacementTestLink(String(result.link ?? ""));
+      setActive((current) => current ? { ...current, testLinkOpened: false, testFeedbackSubmitted: false, testVerified: false } : current);
+    }, "A replacement link was created for this existing Test SMS. The previous link is now invalid.");
   }
 
   const refreshCampaignStatuses = useCallback(async () => {
@@ -235,7 +245,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
 
   async function resumeCampaign(campaign: Campaign) {
     localStorage.setItem(activeCampaignKey, campaign.code);
-    setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(campaignHasTestAttempt(campaign)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false); setSendControlsRevealed(false);
+    setActive(campaign); setMessage(campaign.message); setPurpose(campaign.purpose ?? "feedback_request"); setTemplateId(campaign.templateId ?? "patient_feedback"); setMessageMode(campaign.messageMode ?? "template"); setTested(campaignHasTestAttempt(campaign)); setPreparation(null); setNotice(""); setDeliveryOption(campaign.status === "scheduled" ? "schedule" : "now"); setEditingSchedule(false); setSendControlsRevealed(false); setReplacementTestLink("");
     if (campaign.source !== "custom_list") await run(async () => { const summary = await request("/api/admin/feedback/audience", campaign.audience ?? { source: campaign.source, gender: "all", ageGroups: [], facility: "", group: "", tags: [], purpose: "feedback_request", smsConsent: true, hasPhone: true, excludeContactedSince: "" }); setActive(current => current ? { ...current, queuedCount: Number(summary.eligible) } : current); setPreparation({ ...summary, added: Number(summary.eligible), queued: Number(summary.eligible), existingCampaignRecipients: 0 }); });
   }
 
@@ -249,7 +259,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     });
   }
 
-  function reset() { localStorage.removeItem(activeCampaignKey); setActive(null); setPurpose("feedback_request"); setTemplateId("patient_feedback"); setMessageMode("template"); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); setSendControlsRevealed(false); }
+  function reset() { localStorage.removeItem(activeCampaignKey); setActive(null); setPurpose("feedback_request"); setTemplateId("patient_feedback"); setMessageMode("template"); setMessage(defaultFeedbackMessage); setPreparation(null); setTested(false); setNotice(""); setTestPhone(""); setDeliveryOption("now"); setScheduleDate(""); setScheduleTime(""); setEditingSchedule(false); setSendControlsRevealed(false); setReplacementTestLink(""); }
 
   const steps = ["Audience", "Purpose", "Message", "Preview", "Test", "Send / Schedule", "Results"];
   const hasTestAttempt = active ? campaignHasTestAttempt(active) : tested;
@@ -332,6 +342,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
           </ul>
           <p className={`mt-4 font-semibold ${active.testVerified ? "text-emerald-800" : "text-amber-800"}`}>{active.testVerified ? "Ready to Send" : "Bulk sending is locked until the test is verified."}</p>
           {hasTestAttempt && !active.testVerified && <div className="mt-4 rounded-xl bg-white p-4"><button disabled={busy || !canSend || hasUnsavedMessage} onClick={confirmTestComplete} className="min-h-11 rounded-xl border border-purple-deep px-5 py-3 font-semibold text-purple-deep disabled:opacity-50">I’ve completed the test</button><p className="mt-2 text-sm text-text-muted">This securely re-checks the latest test link and feedback submission. It cannot manually approve or bypass verification.</p></div>}
+          {hasTestAttempt && !active.testVerified && !active.testLinkOpened && <div className="mt-3 rounded-xl border bg-white p-4"><button disabled={busy || !canSend} onClick={replaceTestLink} className="min-h-11 rounded-xl border px-4 py-2 font-semibold disabled:opacity-50">Replace unusable test link</button><p className="mt-2 text-sm text-text-muted">Use this only when the newest SMS link is rejected. It invalidates that link and creates one replacement for the same Test SMS; it does not send another SMS.</p>{replacementTestLink && <p className="mt-3 break-all rounded-lg bg-bg-soft p-3 text-sm"><strong>Replacement secure link:</strong><br/><a className="text-purple-deep underline" href={replacementTestLink} target="_blank" rel="noreferrer">{replacementTestLink}</a></p>}</div>}
           {active.testVerified && !sendControlsRevealed && <button type="button" onClick={() => setSendControlsRevealed(true)} className="mt-4 min-h-11 rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white">Continue to Send</button>}
           {active.testVerified && <div className="mt-4 rounded-2xl border border-emerald-300 bg-white p-4"><strong className="text-lg text-emerald-800">{active.queuedCount} recipients ready</strong><p className="mt-1 text-sm">Message tested and verified. Choose how you want to send it.</p><dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div><dt className="text-text-muted">Excluded</dt><dd className="font-semibold">{finalExclusions}</dd></div><div><dt className="text-text-muted">SMS segments</dt><dd className="font-semibold">{segments}</dd></div><div><dt className="text-text-muted">Estimated total units</dt><dd className="font-semibold">{active.queuedCount*segments}</dd></div></dl><div className="mt-3 rounded-xl bg-bg-soft p-3"><strong>Exact message preview</strong><p className="mt-1 whitespace-pre-wrap text-sm">{previewMessage}</p></div></div>}
           {sendControlsRevealed && <>
