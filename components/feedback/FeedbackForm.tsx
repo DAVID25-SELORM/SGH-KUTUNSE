@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { feedbackSchema, type FeedbackInput, type FeedbackFormInput } from "@/lib/validation";
 import { services } from "@/data/services";
@@ -36,7 +36,7 @@ export function FeedbackForm({ initialTracking }: { initialTracking: { campaign:
   const [serverError, setServerError] = useState("");
   const {
     register,
-    watch,
+    control,
     handleSubmit,
     trigger,
     clearErrors,
@@ -63,11 +63,10 @@ export function FeedbackForm({ initialTracking }: { initialTracking: { campaign:
       void fetch("/api/feedback/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: initialTracking.testToken }) });
     }
   }, [initialTracking.testToken]);
-  const visit = watch("visitType"),
-    service = watch("serviceUnit"),
-    sat = watch("overallSatisfaction"),
-    receipt = watch("receiptConcern"),
-    contact = watch("contactRequested");
+  const [visit, service, sat, receipt, contact] = useWatch({
+    control,
+    name: ["visitType", "serviceUnit", "overallSatisfaction", "receiptConcern", "contactRequested"],
+  });
   async function submit(data: FeedbackInput) {
     setServerError("");
     try {
