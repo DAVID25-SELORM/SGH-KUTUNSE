@@ -3,7 +3,7 @@ import { feedbackSchema } from "@/lib/validation";
 import { deduplicateRecipients, MockSmsProvider, normalizeGhanaPhone } from "@/lib/sms";
 import { appointmentSchema, contactSchema, insuranceVerificationSchema, telemedicineRequestSchema } from "../lib/validation";
 import { createReference } from "../lib/reference";
-import { hasPermission, canMutate } from "../lib/types/admin";
+import { hasPermission, canMutate, normalizeAdminRoles, primaryAdminRole } from "../lib/types/admin";
 import { canTransition } from "../lib/types/submissions";
 
 describe("public validation", () => {
@@ -23,6 +23,13 @@ describe("security utilities", () => {
     expect(hasPermission("reception", "appointments")).toBe(true);
     expect(hasPermission("reception", "insurance")).toBe(false);
     expect(hasPermission("content_editor", "content")).toBe(true);
+  });
+  it("combines multiple roles while preserving legacy role claims", () => {
+    expect(normalizeAdminRoles(["insurance", "reception", "invalid"], "corporate")).toEqual(["reception", "insurance", "corporate"]);
+    expect(hasPermission(["insurance", "content_editor"], "insurance")).toBe(true);
+    expect(hasPermission(["insurance", "content_editor"], "content")).toBe(true);
+    expect(hasPermission(["insurance", "content_editor"], "appointments")).toBe(false);
+    expect(primaryAdminRole(["content_editor", "admin"])).toBe("admin");
   });
   it("enforces the complete role matrix", () => {
     expect(canMutate("viewer")).toBe(false);

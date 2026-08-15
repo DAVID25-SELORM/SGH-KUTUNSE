@@ -13,7 +13,7 @@ const schema = z.strictObject({ action: z.enum(["preview", "apply"]), confirmati
 export async function POST(request: Request) {
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const actor = await verifyAdminRequest("contacts_manage");
-  if (!actor || actor.role !== "super_admin") return NextResponse.json({ ok: false }, { status: 403 });
+  if (!actor || !actor.roles.includes("super_admin")) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, schema); if (parsed.error) return parsed.error;
   try {
     const preview = await previewScreeningConsentMigration();

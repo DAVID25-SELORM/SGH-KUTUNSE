@@ -149,11 +149,11 @@ const roleName = (role: AdminRole) =>
 export function AdminShell({
   children,
   email,
-  role,
+  roles,
 }: {
   children: React.ReactNode;
   email: string;
-  role: AdminRole;
+  roles: AdminRole[];
 }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -197,7 +197,7 @@ export function AdminShell({
     >
       {groups.map((group) => {
         const items = group.items.filter(
-          (item) => !item.permission || hasPermission(role, item.permission),
+          (item) => !item.permission || hasPermission(roles, item.permission),
         );
         if (!items.length) return null;
         return (
@@ -270,7 +270,7 @@ export function AdminShell({
           </Link>
           <div className="hidden max-w-56 text-right md:block">
             <p className="truncate text-sm font-semibold">{email}</p>
-            <p className="text-xs text-text-muted">{roleName(role)}</p>
+            <p className="text-xs text-text-muted">{roles.map(roleName).join(", ")}</p>
           </div>
           <LogoutButton />
         </div>

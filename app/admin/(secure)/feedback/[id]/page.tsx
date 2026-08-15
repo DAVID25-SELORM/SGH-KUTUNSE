@@ -36,12 +36,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     doc.ref.collection("internal_notes").orderBy("createdAt", "desc").limit(20).get(),
     doc.ref.collection("history").orderBy("createdAt", "desc").limit(50).get(),
   ]);
-  const canManage = hasPermission(session.role, "feedback_manage");
-  const canReceipt = hasPermission(session.role, "feedback_receipts");
+  const canManage = hasPermission(session.roles, "feedback_manage");
+  const canReceipt = hasPermission(session.roles, "feedback_receipts");
   if (data.receiptRestricted && canReceipt) await writeAudit(session.uid, "feedback.receipt_viewed", "feedback", id);
   const administrators = canManage ? (await adminAuth.listUsers(100)).users
-    .filter((user) => !user.disabled && user.customClaims?.role)
-    .map((user) => ({ uid: user.uid, label: `${user.displayName ?? user.email ?? "Administrator"} · ${humanizeFeedbackValue(user.customClaims?.role)}` })) : [];
+    .filter((user) => !user.disabled && (user.customClaims?.role || user.customClaims?.roles))
+    .map((user) => ({ uid: user.uid, label: `${user.displayName ?? user.email ?? "Administrator"} · ${humanizeFeedbackValue(user.customClaims?.roles ?? user.customClaims?.role)}` })) : [];
   const receipt = (data.receiptDetails ?? {}) as Record<string, unknown>;
   const ratings = (data.ratings ?? {}) as Record<string, unknown>;
   const status = String(data.status ?? "new") as SubmissionStatus;

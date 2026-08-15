@@ -15,7 +15,7 @@ export async function GET() {
   const actor = await getAdminSession();
   if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   const snapshot = await adminDb.collection("admin_notifications").orderBy("createdAt", "desc").limit(100).get();
-  const visible = snapshot.docs.filter((doc) => allowed(actor.role, String(doc.get("type") ?? "")));
+  const visible = snapshot.docs.filter((doc) => allowed(actor.roles, String(doc.get("type") ?? "")));
   const stateRefs = visible.map((doc) => adminDb.collection("admin_notification_states").doc(actor.uid).collection("items").doc(doc.id));
   const states = stateRefs.length ? await adminDb.getAll(...stateRefs) : [];
   const items = visible.map((doc, index) => ({ id: doc.id, type: doc.get("type"), title: doc.get("title"), body: doc.get("body"), reference: doc.get("reference"), targetUrl: doc.get("targetUrl"), priority: doc.get("priority"), createdAt: doc.get("createdAt")?.toDate?.()?.toISOString?.() ?? null, read: states[index]?.exists && Boolean(states[index].get("readAt")) }));
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   const body = await request.json().catch(() => null) as { id?: unknown; all?: unknown } | null;
   const snapshot = await adminDb.collection("admin_notifications").orderBy("createdAt", "desc").limit(100).get();
-  const visible = snapshot.docs.filter((doc) => allowed(actor.role, String(doc.get("type") ?? "")));
+  const visible = snapshot.docs.filter((doc) => allowed(actor.roles, String(doc.get("type") ?? "")));
   const targets = body?.all === true ? visible : visible.filter((doc) => doc.id === body?.id);
   if (!targets.length) return NextResponse.json({ ok: false, message: "Notification not found." }, { status: 404 });
   const batch = adminDb.batch();

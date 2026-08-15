@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
   if (!(kind in submissionKinds) || !/^[\w-]{1,128}$/.test(id)) return NextResponse.json({ ok: false }, { status: 404 });
   const config = submissionKinds[kind as SubmissionKind];
   const actor = await verifyAdminRequest(config.permission);
-  if (!actor || !canMutate(actor.role)) return NextResponse.json({ ok: false }, { status: 403 });
+  if (!actor || !canMutate(actor.roles)) return NextResponse.json({ ok: false }, { status: 403 });
   if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, schema); if (parsed.error) return parsed.error;
   const { note, ...requested } = parsed.data;
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
   const snapshot = await ref.get(); if (!snapshot.exists) return NextResponse.json({ ok: false }, { status: 404 });
   const current = snapshot.data()!;
   if(requested.status&&!canTransition(current.status as SubmissionStatus,requested.status))return NextResponse.json({ok:false,message:"That status transition is not allowed."},{status:409});
-  if(requested.assignedTo){try{const assignee=await adminAuth.getUser(requested.assignedTo);if(assignee.disabled||!assignee.customClaims?.role)return NextResponse.json({ok:false,message:"Assignment requires an active administrator."},{status:400})}catch{return NextResponse.json({ok:false,message:"Assigned administrator was not found."},{status:400})}}
+  if(requested.assignedTo){try{const assignee=await adminAuth.getUser(requested.assignedTo);if(assignee.disabled||(!assignee.customClaims?.role&&!assignee.customClaims?.roles))return NextResponse.json({ok:false,message:"Assignment requires an active administrator."},{status:400})}catch{return NextResponse.json({ok:false,message:"Assigned administrator was not found."},{status:400})}}
   const changes = Object.fromEntries(Object.entries(requested).filter(([, value]) => value !== undefined));
   const actorDisplayName = actor.name ?? actor.email ?? "Administrator";
   const events: Array<{ action: string; safeMetadata: Record<string, string | null> }> = [];

@@ -1,2 +1,121 @@
-import Link from "next/link"; import { notFound } from "next/navigation"; import { ContactEditor } from "@/components/admin/ContactEditor"; import { requireAdmin } from "@/lib/server/auth"; import { adminDb } from "@/lib/server/firebase-admin"; import { serialize } from "@/lib/server/admin-data"; import { hasPermission } from "@/lib/types/admin";
-export default async function ContactPage({params}:{params:Promise<{id:string}>}){const session=await requireAdmin("contacts"),{id}=await params;if(!/^[a-f0-9]{64}$/.test(id))notFound();const ref=adminDb.collection("feedback_contacts").doc(id),doc=await ref.get();if(!doc.exists)notFound();const data={id,...serialize(doc.data()!)};const [campaigns,audit]=await Promise.all([adminDb.collectionGroup("recipients").where("phoneHash","==",id).limit(100).get().catch(error=>{console.error("contact_campaign_history_unavailable",{contactId:id,errorCode:typeof error==="object"&&error&&"code" in error?String(error.code):"unknown"});return null}),adminDb.collection("audit_logs").where("entityId","==",id).limit(100).get()]);return <section><Link href="/admin/contacts" className="font-semibold text-purple-deep">← Back to Contacts</Link><div className="mt-5"><p className="text-sm font-semibold text-pink-accent">CONTACT PROFILE</p><h1 className="text-3xl font-semibold text-purple-deep">{String(data.fullName||data.name||"Name not provided")}</h1><p className="mt-2 break-all text-xs text-text-muted">Contact ID: {id}</p></div>{hasPermission(session.role,"contacts_manage")?<div className="mt-6"><ContactEditor initial={data} canDelete={session.role==="super_admin"}/></div>:<p className="mt-6 rounded-2xl border bg-white p-5">You have read-only access to this contact.</p>}<div className="mt-6 grid gap-6 lg:grid-cols-2"><section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold">Campaign participation</h2>{campaigns?campaigns.docs.map(d=><p key={d.ref.path} className="mt-3 border-t pt-3 text-sm">{d.ref.parent.parent?.id} · {String(d.data().status??"unknown")}</p>):<p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Campaign history is temporarily unavailable. Contact details remain available and no changes were made.</p>}{campaigns?.empty?<p className="mt-3 text-sm text-text-muted">No campaign history.</p>:null}</section><section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold">Activity history</h2>{audit.docs.sort((a,b)=>String(b.data().timestamp??"").localeCompare(String(a.data().timestamp??""))).map(d=><p key={d.id} className="mt-3 border-t pt-3 text-sm"><strong>{String(d.data().action)}</strong><br/><span className="text-text-muted">{String(serialize(d.data()).timestamp??"Pending")}</span></p>)}{audit.empty?<p className="mt-3 text-sm text-text-muted">No contact activity recorded.</p>:null}</section></div><p className="mt-6 rounded-xl bg-bg-soft p-4 text-sm">Feedback and medical details are intentionally not joined to this profile. Authorized staff must use the protected Feedback Inbox for that information.</p></section>}
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ContactEditor } from "@/components/admin/ContactEditor";
+import { requireAdmin } from "@/lib/server/auth";
+import { adminDb } from "@/lib/server/firebase-admin";
+import { serialize } from "@/lib/server/admin-data";
+import { hasPermission } from "@/lib/types/admin";
+export default async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await requireAdmin("contacts"),
+    { id } = await params;
+  if (!/^[a-f0-9]{64}$/.test(id)) notFound();
+  const ref = adminDb.collection("feedback_contacts").doc(id),
+    doc = await ref.get();
+  if (!doc.exists) notFound();
+  const data = { id, ...serialize(doc.data()!) };
+  const [campaigns, audit] = await Promise.all([
+    adminDb
+      .collectionGroup("recipients")
+      .where("phoneHash", "==", id)
+      .limit(100)
+      .get()
+      .catch((error) => {
+        console.error("contact_campaign_history_unavailable", {
+          contactId: id,
+          errorCode:
+            typeof error === "object" && error && "code" in error
+              ? String(error.code)
+              : "unknown",
+        });
+        return null;
+      }),
+    adminDb
+      .collection("audit_logs")
+      .where("entityId", "==", id)
+      .limit(100)
+      .get(),
+  ]);
+  return (
+    <section>
+      <Link href="/admin/contacts" className="font-semibold text-purple-deep">
+        ← Back to Contacts
+      </Link>
+      <div className="mt-5">
+        <p className="text-sm font-semibold text-pink-accent">
+          CONTACT PROFILE
+        </p>
+        <h1 className="text-3xl font-semibold text-purple-deep">
+          {String(data.fullName || data.name || "Name not provided")}
+        </h1>
+        <p className="mt-2 break-all text-xs text-text-muted">
+          Contact ID: {id}
+        </p>
+      </div>
+      {hasPermission(session.roles, "contacts_manage") ? (
+        <div className="mt-6">
+          <ContactEditor
+            initial={data}
+            canDelete={session.roles.includes("super_admin")}
+          />
+        </div>
+      ) : (
+        <p className="mt-6 rounded-2xl border bg-white p-5">
+          You have read-only access to this contact.
+        </p>
+      )}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border bg-white p-5">
+          <h2 className="font-semibold">Campaign participation</h2>
+          {campaigns ? (
+            campaigns.docs.map((d) => (
+              <p key={d.ref.path} className="mt-3 border-t pt-3 text-sm">
+                {d.ref.parent.parent?.id} ·{" "}
+                {String(d.data().status ?? "unknown")}
+              </p>
+            ))
+          ) : (
+            <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Campaign history is temporarily unavailable. Contact details
+              remain available and no changes were made.
+            </p>
+          )}
+          {campaigns?.empty ? (
+            <p className="mt-3 text-sm text-text-muted">No campaign history.</p>
+          ) : null}
+        </section>
+        <section className="rounded-2xl border bg-white p-5">
+          <h2 className="font-semibold">Activity history</h2>
+          {audit.docs
+            .sort((a, b) =>
+              String(b.data().timestamp ?? "").localeCompare(
+                String(a.data().timestamp ?? ""),
+              ),
+            )
+            .map((d) => (
+              <p key={d.id} className="mt-3 border-t pt-3 text-sm">
+                <strong>{String(d.data().action)}</strong>
+                <br />
+                <span className="text-text-muted">
+                  {String(serialize(d.data()).timestamp ?? "Pending")}
+                </span>
+              </p>
+            ))}
+          {audit.empty ? (
+            <p className="mt-3 text-sm text-text-muted">
+              No contact activity recorded.
+            </p>
+          ) : null}
+        </section>
+      </div>
+      <p className="mt-6 rounded-xl bg-bg-soft p-4 text-sm">
+        Feedback and medical details are intentionally not joined to this
+        profile. Authorized staff must use the protected Feedback Inbox for that
+        information.
+      </p>
+    </section>
+  );
+}

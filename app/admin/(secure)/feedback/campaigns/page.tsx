@@ -37,8 +37,8 @@ export default async function Page() {
       <strong>Purpose-aware test verification</strong>
       <p className="mt-2 text-sm">Feedback requests unlock only after secure feedback submission. Approved non-feedback messages unlock after the provider accepts the exact tested message.</p>
     </div>
-    <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.role, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} initialSmsPolicy={smsPolicy} />
-    {session.role === "super_admin" ? <ConsentMigrationPanel /> : null}
+    <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.roles, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} initialSmsPolicy={smsPolicy} />
+    {session.roles.includes("super_admin") ? <ConsentMigrationPanel /> : null}
     <div className="mt-8"><FeedbackQr /></div>
   </section>;
 }

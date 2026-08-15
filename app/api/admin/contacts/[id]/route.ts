@@ -20,7 +20,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 }); const actor = await verifyAdminRequest("contacts_manage"); if (!actor || actor.role !== "super_admin") return NextResponse.json({ ok: false, message: "Only a Super Admin can delete contacts." }, { status: 403 });
+  if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 }); const actor = await verifyAdminRequest("contacts_manage"); if (!actor || !actor.roles.includes("super_admin")) return NextResponse.json({ ok: false, message: "Only a Super Admin can delete contacts." }, { status: 403 });
   const { id } = await params; if (!valid(id)) return NextResponse.json({ ok: false }, { status: 404 }); const ref = adminDb.collection("feedback_contacts").doc(id); const current = await ref.get(); if (!current.exists) return NextResponse.json({ ok: false }, { status: 404 });
   const campaignUse = await adminDb.collectionGroup("recipients").where("phoneHash", "==", id).limit(1).get(); if (!campaignUse.empty) { await ref.update({ status: "archived", doNotContact: true, fullName: "", email: "", notes: "", updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid }); await writeAudit(actor.uid, "contact.archived", "contact", id, { reason: "historical_reference" }); return NextResponse.json({ ok: true, archived: true }); }
   await ref.delete(); await writeAudit(actor.uid, "contact.deleted", "contact", id); return NextResponse.json({ ok: true, deleted: true });

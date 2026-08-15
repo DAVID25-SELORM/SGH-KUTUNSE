@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/server/firebase-admin";
-import { ADMIN_ROLES } from "@/lib/types/admin";
+import { normalizeAdminRoles } from "@/lib/types/admin";
 import { SESSION_COOKIE } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
 import { isTrustedOrigin } from "@/lib/server/origin";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const { idToken } = (await request.json()) as { idToken?: unknown };
     if (typeof idToken !== "string" || idToken.length > 5000) throw new Error("invalid");
     const decoded = await adminAuth.verifyIdToken(idToken, true);
-    if (typeof decoded.role !== "string" || !ADMIN_ROLES.includes(decoded.role as never)) return NextResponse.json({ ok: false, message: "This account is not authorized for administration." }, { status: 403 });
+    if (!normalizeAdminRoles(decoded.roles, decoded.role).length) return NextResponse.json({ ok: false, message: "This account is not authorized for administration." }, { status: 403 });
     const session = await adminAuth.createSessionCookie(idToken, { expiresIn });
     await writeAudit(decoded.uid, "admin.login", "admin_user", decoded.uid);
     const response = NextResponse.json({ ok: true });

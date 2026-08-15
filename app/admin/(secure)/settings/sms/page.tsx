@@ -10,6 +10,6 @@ export default async function Page() {
     <p className="text-sm font-semibold text-pink-accent">ADMIN SETTINGS</p>
     <h1 className="text-3xl font-semibold text-purple-deep">SMS Settings</h1>
     <p className="mt-3 text-text-body">Set the hospital-wide hours when SMS campaigns may execute. Ghana time is GMT.</p>
-    <SmsSettingsForm initialPolicy={policy} canWrite={hasPermission(session.role, "sms_settings_write")}/>
+    <SmsSettingsForm initialPolicy={policy} canWrite={hasPermission(session.roles, "sms_settings_write")}/>
   </section>;
 }
