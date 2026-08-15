@@ -5,6 +5,7 @@ import { campaignSources, defaultFeedbackMessage } from "@/lib/feedback-campaign
 import { AGE_GROUPS } from "@/lib/contacts";
 import Link from "next/link";
 import { isDateWithinSmsPolicy, isTimeWithinSmsPolicy, smsPolicyLabel, type SmsPolicy } from "@/lib/sms-policy";
+import { mergeCampaignVerificationStatus } from "@/lib/feedback-verification-state";
 
 type Campaign = {
   code: string; name: string; source: string; message: string; status: string;
@@ -24,7 +25,7 @@ const labels: Record<string, string> = {
 };
 
 async function request(url: string, body?: unknown) {
-  const response = await fetch(url, body === undefined ? undefined : {
+  const response = await fetch(url, body === undefined ? { cache: "no-store" } : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   const data = await response.json();
@@ -109,7 +110,7 @@ export function FeedbackCampaignManager({ initialCampaigns, canSend, providerMod
     const timer = window.setInterval(async () => {
       try {
         const status = await request(`/api/admin/feedback/campaigns/${active.code}/status`);
-        setActive((current) => current ? { ...current, ...status } : current);
+        setActive((current) => current ? mergeCampaignVerificationStatus(current, status) : current);
       } catch { /* Keep polling; transient network failures must not change verification state. */ }
     }, 3000);
     return () => window.clearInterval(timer);

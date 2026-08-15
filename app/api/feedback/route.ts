@@ -33,7 +33,8 @@ export async function POST(request: Request) {
       { ok: true, reference: await createFeedback(parsed.data) },
       { status: 201 },
     );
-  } catch {
+  } catch (error) {
+    console.error("feedback_test_verification", { event: "submission_failed", campaignId: parsed.data.campaign || null, errorClass: error instanceof Error ? error.message : "unknown" });
     return publicError();
   }
 }

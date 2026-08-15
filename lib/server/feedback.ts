@@ -1,9 +1,9 @@
 import "server-only";
 import { FieldValue } from "firebase-admin/firestore";
-import { createHash } from "node:crypto";
 import { adminDb } from "./firebase-admin";
 import { createReference } from "@/lib/reference";
 import type { FeedbackInput } from "@/lib/validation";
+import { feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
 export function feedbackFlags(data: FeedbackInput) {
   const low =
     data.overallSatisfaction === "very_dissatisfied" ||
@@ -15,7 +15,8 @@ export function feedbackFlags(data: FeedbackInput) {
   };
 }
 export async function createFeedback(data: FeedbackInput) {
-  const testTokenHash = data.testToken ? createHash("sha256").update(data.testToken).digest("hex") : "";
+  const testTokenHash = data.testToken ? hashFeedbackTestToken(data.testToken) : "";
+  let verifiedLogCampaignId = data.campaign || "";
   for (let i = 0; i < 4; i++) {
     const reference = createReference("FBK");
     const ref = adminDb.collection("feedback_responses").doc();
@@ -25,13 +26,9 @@ export async function createFeedback(data: FeedbackInput) {
         const reservation = adminDb
           .collection("submission_references")
           .doc(reference);
-        const campaignRef = data.campaign
-          ? adminDb.collection("feedback_campaigns").doc(data.campaign)
-          : null;
         const testTokenRef = testTokenHash ? adminDb.collection("feedback_test_tokens").doc(testTokenHash) : null;
-        const [reservationSnapshot, campaignSnapshot, testTokenSnapshot] = await Promise.all([
+        const [reservationSnapshot, testTokenSnapshot] = await Promise.all([
           t.get(reservation),
-          campaignRef ? t.get(campaignRef) : Promise.resolve(null),
           testTokenRef ? t.get(testTokenRef) : Promise.resolve(null),
         ]);
         if (reservationSnapshot.exists)
@@ -39,10 +36,25 @@ export async function createFeedback(data: FeedbackInput) {
         const safe = { ...data };
         delete safe.website;
         delete safe.testToken;
+        let verifiedCampaignId = data.campaign || "";
         if (testTokenRef) {
-          if (!testTokenSnapshot?.exists || testTokenSnapshot.data()?.used === true) throw new Error("INVALID_TEST_TOKEN");
-          const expiresAt = testTokenSnapshot.data()?.expiresAt?.toDate?.();
-          if (!(expiresAt instanceof Date) || expiresAt.getTime() <= Date.now() || testTokenSnapshot.data()?.campaignId !== data.campaign) throw new Error("INVALID_TEST_TOKEN");
+          const decision = validateFeedbackTestToken(testTokenSnapshot?.exists ? testTokenSnapshot.data()! : null, verifiedCampaignId);
+          if (!decision.ok) {
+            console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId || null, reason: decision.reason });
+            throw new Error("INVALID_TEST_TOKEN");
+          }
+          verifiedCampaignId = decision.campaignId;
+          verifiedLogCampaignId = decision.campaignId;
+        }
+        const campaignRef = verifiedCampaignId ? adminDb.collection("feedback_campaigns").doc(verifiedCampaignId) : null;
+        const campaignSnapshot = campaignRef ? await t.get(campaignRef) : null;
+        if (testTokenRef && !campaignSnapshot?.exists) {
+          console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "campaign_not_found" });
+          throw new Error("INVALID_TEST_TOKEN");
+        }
+        if (testTokenRef && !["test_sent", "test_link_opened"].includes(String(campaignSnapshot?.data()?.status ?? ""))) {
+          console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "invalid_campaign_state" });
+          throw new Error("INVALID_TEST_TOKEN");
         }
         t.create(reservation, {
           kind: "feedback",
@@ -51,6 +63,7 @@ export async function createFeedback(data: FeedbackInput) {
         });
         t.create(ref, {
           ...safe,
+          ...(verifiedCampaignId ? { campaign: verifiedCampaignId } : {}),
           ...feedbackFlags(data),
           reference,
           status: "new",
@@ -69,14 +82,15 @@ export async function createFeedback(data: FeedbackInput) {
         });
         if (campaignRef && campaignSnapshot?.exists) {
           const update: Record<string, unknown> = { responseCount: FieldValue.increment(1), updatedAt: now };
-          if (testTokenRef) Object.assign(update, { status: "test_verified", testVerified: true, testFeedbackSubmittedAt: now, testVerifiedAt: now, testFeedbackReference: reference });
+          if (testTokenRef) Object.assign(update, feedbackTestVerifiedFields(reference, ref.id, campaignSnapshot.data()?.testLinkOpenedAt, now));
           t.update(campaignRef, update);
         }
         if (testTokenRef) {
           t.update(testTokenRef, { used: true, submittedAt: now, feedbackId: ref.id });
-          t.create(adminDb.collection("audit_logs").doc(), { actorUid: "system:feedback-test", action: "feedback_campaign.test_verified", entityType: "feedback_campaign", entityId: data.campaign, metadata: {}, timestamp: now });
+          t.create(adminDb.collection("audit_logs").doc(), { actorUid: "system:feedback-test", action: "feedback_campaign.test_verified", entityType: "feedback_campaign", entityId: verifiedCampaignId, metadata: { feedbackReference: reference }, timestamp: now });
         }
       });
+      if (testTokenHash) console.info("feedback_test_verification", { event: "submission_verified", campaignId: verifiedLogCampaignId, reference });
       return reference;
     } catch (e) {
       if (e instanceof Error && e.message === "REFERENCE_COLLISION") continue;

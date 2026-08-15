@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { verifyAdminRequest } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
+import { campaignStatusNoStoreHeaders, campaignVerificationStatus } from "@/lib/feedback-verification-state";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const actor = await verifyAdminRequest("feedback_campaigns");
@@ -26,11 +27,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
   return NextResponse.json({
     ok: true,
-    status: String(data.status ?? "draft"),
-    testSmsAccepted: Boolean(data.testSmsAcceptedAt),
-    testLinkOpened: Boolean(data.testLinkOpenedAt),
-    testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt),
-    testVerified: data.testVerified === true,
+    ...campaignVerificationStatus(data),
     recipientCount: Number(data.recipientCount ?? 0),
     queuedCount: Number(data.queuedCount ?? 0),
     acceptedCount: Number(data.acceptedCount ?? 0),
@@ -38,5 +35,5 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     failedCount: Number(data.failedCount ?? 0),
     unknownCount: Number(data.unknownCount ?? 0),
     optedOutCount: Number(data.optedOutCount ?? 0),
-  });
+  }, { headers: campaignStatusNoStoreHeaders });
 }

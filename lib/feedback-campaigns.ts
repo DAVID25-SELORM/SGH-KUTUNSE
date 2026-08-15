@@ -42,8 +42,8 @@ export function recipientKey(phone: string) {
 
 export function campaignLink(code: string, source: string, testToken?: string) {
   const url = new URL("https://www.satellitegeneralhospital.com/feedback");
+  if (testToken) url.searchParams.set("t", testToken);
   url.searchParams.set("campaign", code);
   url.searchParams.set("source", source === "health_screening" ? "health_screening" : "sms");
-  if (testToken) url.searchParams.set("t", testToken);
   return url.toString();
 }
