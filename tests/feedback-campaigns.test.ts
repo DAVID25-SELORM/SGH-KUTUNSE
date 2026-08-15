@@ -1,21 +1,227 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { campaignCreateSchema, campaignLink, campaignMessageSchema, canEditCampaignMessage, defaultFeedbackMessage, parseRecipientImport, recipientKey } from "@/lib/feedback-campaigns";
+import {
+  campaignCreateSchema,
+  campaignLink,
+  campaignMessageSchema,
+  canEditCampaignMessage,
+  defaultFeedbackMessage,
+  parseRecipientImport,
+  recipientKey,
+} from "@/lib/feedback-campaigns";
 import { MockSmsProvider } from "@/lib/sms";
 import { ArkeselSmsProvider } from "@/lib/server/sms";
-describe("feedback campaigns",()=>{
- it("normalizes and deduplicates",()=>{const r=parseRecipientImport("0241234567, +233241234567\ninvalid");expect(r.recipients).toEqual(["+233241234567"]);expect(r.invalidCount).toBe(1);expect(r.duplicateCount).toBe(1)});
- it("uses stable opaque keys",()=>{expect(recipientKey("+233241234567")).toBe(recipientKey("+233241234567"));expect(recipientKey("+233241234567")).not.toContain("241234567")});
- it("requires a safe template",()=>{expect(campaignCreateSchema.safeParse({name:"OPD feedback",source:"outpatient",message:defaultFeedbackMessage}).success).toBe(true);expect(campaignCreateSchema.safeParse({name:"OPD feedback",source:"outpatient",message:"Your diagnosis is ready [SURVEY LINK]"}).success).toBe(false)});
- it("validates edited messages with the same safety controls",()=>{expect(campaignMessageSchema.safeParse({message:`${defaultFeedbackMessage} Thank you.`}).success).toBe(true);expect(campaignMessageSchema.safeParse({message:"Thank you for visiting our hospital."}).success).toBe(false);expect(campaignMessageSchema.safeParse({message:"Your medication information is available here: [SURVEY LINK]"}).success).toBe(false)});
- it("allows safe edits that force retesting until scheduling",()=>{expect(canEditCampaignMessage({status:"draft"})).toBe(true);expect(canEditCampaignMessage({status:"ready"})).toBe(true);expect(canEditCampaignMessage({status:"test_sent"})).toBe(true);expect(canEditCampaignMessage({status:"test_verified",testVerified:true})).toBe(true);expect(canEditCampaignMessage({status:"scheduled"})).toBe(false)});
- it("supports an all-contacts campaign source",()=>{expect(campaignCreateSchema.safeParse({name:"All contacts feedback",source:"all_contacts",message:defaultFeedbackMessage}).success).toBe(true)});
- it("supports a staff campaign source",()=>{expect(campaignCreateSchema.safeParse({name:"Staff feedback",source:"staff",message:defaultFeedbackMessage}).success).toBe(true)});
- it("creates non-identifying links",()=>{const link=campaignLink("opaque-code","health_screening");expect(link).toContain("campaign=opaque-code");expect(link).not.toMatch(/phone|patient/i)});
- it("binds an opaque test token without exposing a phone",()=>{const token="A".repeat(43);const link=campaignLink("opaque-code","staff",token);expect(link).toContain(`t=${token}`);expect(link).toContain("campaign=opaque-code");expect(link).not.toMatch(/phone|recipient/i)});
- it("keeps mock sending non-live",async()=>{const p=new MockSmsProvider();expect(p.mode).toBe("mock");expect(await p.sendMessage("+233241234567","hello","key")).toEqual({providerId:"mock-key",status:"mocked"})});
- it("sends Arkesel tests in sandbox mode",async()=>{const original=global.fetch;global.fetch=async(_input,init)=>{expect((init?.headers as Record<string,string>)["api-key"]).toBe("secret");expect(JSON.parse(String(init?.body))).toMatchObject({sender:"SGH-KUTUNSE",recipients:["+233241234567"],sandbox:true});return new Response(JSON.stringify({status:"success",data:[{recipient:"233241234567",id:"sms-1"}]}),{status:200,headers:{"Content-Type":"application/json"}})};try{const p=new ArkeselSmsProvider(" secret\r\n","SGH-KUTUNSE",true);expect(p.mode).toBe("sandbox");expect(await p.sendMessage("+233241234567","hello","key")).toEqual({providerId:"sms-1",status:"mocked"})}finally{global.fetch=original}});
- it("recognizes a successful Arkesel response when its recipient format differs",async()=>{const original=global.fetch;global.fetch=async()=>new Response(JSON.stringify({status:"success",data:[{recipient:"050 822 5456",id:"sms-formatted"}]}),{status:200,headers:{"Content-Type":"application/json"}});try{const p=new ArkeselSmsProvider("secret","SGH-KUTUNSE",false);expect(await p.sendMessage("+233508225456","hello","key")).toEqual({providerId:"sms-formatted",status:"accepted"})}finally{global.fetch=original}});
- it("marks a successful response without a provider UUID as delivery unknown",async()=>{const original=global.fetch;global.fetch=async()=>new Response(JSON.stringify({status:"success",data:[]}),{status:200,headers:{"Content-Type":"application/json"}});try{const p=new ArkeselSmsProvider("secret","SGH-KUTUNSE",false);expect(await p.sendMessage("+233508225456","hello","key")).toEqual({providerId:"",status:"failed",failureClass:"delivery_unknown"})}finally{global.fetch=original}});
- it("authenticates delivery report lookup server-side",async()=>{const original=global.fetch;global.fetch=async(input,init)=>{expect(String(input)).toBe("https://sms.arkesel.com/api/v2/sms/message-reports");expect((init?.headers as Record<string,string>)["api-key"]).toBe("secret");expect(JSON.parse(String(init?.body))).toEqual({msg_ids:["sms-1"]});return new Response(JSON.stringify({status:"success",data:{"sms-1":{status:"DELIVERED"}}}),{status:200,headers:{"Content-Type":"application/json"}})};try{const p=new ArkeselSmsProvider("secret","SGH-KUTUNSE",false);expect(await p.getDeliveryReports(["sms-1"])).toEqual([{providerId:"sms-1",status:"DELIVERED"}])}finally{global.fetch=original}});
+describe("feedback campaigns", () => {
+  it("normalizes and deduplicates", () => {
+    const r = parseRecipientImport("0241234567, +233241234567\ninvalid");
+    expect(r.recipients).toEqual(["+233241234567"]);
+    expect(r.invalidCount).toBe(1);
+    expect(r.duplicateCount).toBe(1);
+  });
+  it("uses stable opaque keys", () => {
+    expect(recipientKey("+233241234567")).toBe(recipientKey("+233241234567"));
+    expect(recipientKey("+233241234567")).not.toContain("241234567");
+  });
+  it("requires a safe template", () => {
+    expect(
+      campaignCreateSchema.safeParse({
+        name: "OPD feedback",
+        source: "outpatient",
+        message: defaultFeedbackMessage,
+      }).success,
+    ).toBe(true);
+    expect(
+      campaignCreateSchema.safeParse({
+        name: "OPD feedback",
+        source: "outpatient",
+        message: "Your diagnosis is ready [SURVEY LINK]",
+      }).success,
+    ).toBe(false);
+  });
+  it("validates edited messages with the same safety controls", () => {
+    expect(
+      campaignMessageSchema.safeParse({
+        message: `${defaultFeedbackMessage} Thank you.`,
+      }).success,
+    ).toBe(true);
+    expect(
+      campaignMessageSchema.safeParse({
+        message: "Thank you for visiting our hospital.",
+      }).success,
+    ).toBe(false);
+    expect(
+      campaignMessageSchema.safeParse({
+        message: "Your medication information is available here: [SURVEY LINK]",
+      }).success,
+    ).toBe(false);
+  });
+  it("allows safe edits that force retesting until scheduling", () => {
+    expect(canEditCampaignMessage({ status: "draft" })).toBe(true);
+    expect(canEditCampaignMessage({ status: "ready" })).toBe(true);
+    expect(canEditCampaignMessage({ status: "test_sent" })).toBe(true);
+    expect(
+      canEditCampaignMessage({ status: "test_verified", testVerified: true }),
+    ).toBe(true);
+    expect(canEditCampaignMessage({ status: "scheduled" })).toBe(false);
+  });
+  it("supports an all-contacts campaign source", () => {
+    expect(
+      campaignCreateSchema.safeParse({
+        name: "All contacts feedback",
+        source: "all_contacts",
+        message: defaultFeedbackMessage,
+      }).success,
+    ).toBe(true);
+  });
+  it("supports a staff campaign source", () => {
+    expect(
+      campaignCreateSchema.safeParse({
+        name: "Staff feedback",
+        source: "staff",
+        message: defaultFeedbackMessage,
+      }).success,
+    ).toBe(true);
+  });
+  it("creates non-identifying links", () => {
+    const link = campaignLink("opaque-code", "health_screening");
+    expect(link).toContain("campaign=opaque-code");
+    expect(link).not.toMatch(/phone|patient/i);
+  });
+  it("binds an opaque test token without exposing a phone", () => {
+    const token = "A".repeat(43);
+    const link = campaignLink("opaque-code", "staff", token);
+    expect(link).toContain(`t=${token}`);
+    expect(link).toContain("campaign=opaque-code");
+    expect(link).not.toMatch(/phone|recipient/i);
+  });
+  it("keeps mock sending non-live", async () => {
+    const p = new MockSmsProvider();
+    expect(p.mode).toBe("mock");
+    expect(await p.sendMessage("+233241234567", "hello", "key")).toEqual({
+      providerId: "mock-key",
+      status: "mocked",
+    });
+  });
+  it("sends Arkesel tests in sandbox mode", async () => {
+    const original = global.fetch;
+    global.fetch = async (_input, init) => {
+      expect((init?.headers as Record<string, string>)["api-key"]).toBe(
+        "secret",
+      );
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        sender: "SGH-KUTUNSE",
+        recipients: ["+233241234567"],
+        sandbox: true,
+      });
+      return new Response(
+        JSON.stringify({
+          status: "success",
+          data: [{ recipient: "233241234567", id: "sms-1" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    try {
+      const p = new ArkeselSmsProvider(" secret\r\n", "SGH-KUTUNSE", true);
+      expect(p.mode).toBe("sandbox");
+      expect(await p.sendMessage("+233241234567", "hello", "key")).toEqual({
+        providerId: "sms-1",
+        status: "mocked",
+      });
+    } finally {
+      global.fetch = original;
+    }
+  });
+  it("recognizes a successful Arkesel response when its recipient format differs", async () => {
+    const original = global.fetch;
+    global.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          status: "success",
+          data: [{ recipient: "050 822 5456", id: "sms-formatted" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    try {
+      const p = new ArkeselSmsProvider("secret", "SGH-KUTUNSE", false);
+      expect(await p.sendMessage("+233508225456", "hello", "key")).toEqual({
+        providerId: "sms-formatted",
+        status: "accepted",
+      });
+    } finally {
+      global.fetch = original;
+    }
+  });
+  it("marks a successful response without a provider UUID as delivery unknown", async () => {
+    const original = global.fetch;
+    global.fetch = async () =>
+      new Response(JSON.stringify({ status: "success", data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    try {
+      const p = new ArkeselSmsProvider("secret", "SGH-KUTUNSE", false);
+      expect(await p.sendMessage("+233508225456", "hello", "key")).toEqual({
+        providerId: "",
+        status: "failed",
+        failureClass: "delivery_unknown",
+      });
+    } finally {
+      global.fetch = original;
+    }
+  });
+  it("authenticates delivery report lookup server-side", async () => {
+    const original = global.fetch;
+    global.fetch = async (input, init) => {
+      expect(String(input)).toBe(
+        "https://sms.arkesel.com/api/v2/sms/message-reports",
+      );
+      expect((init?.headers as Record<string, string>)["api-key"]).toBe(
+        "secret",
+      );
+      expect(JSON.parse(String(init?.body))).toEqual({ msg_ids: ["sms-1"] });
+      return new Response(
+        JSON.stringify({
+          status: "success",
+          data: { "sms-1": { status: "DELIVERED" } },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    try {
+      const p = new ArkeselSmsProvider("secret", "SGH-KUTUNSE", false);
+      expect(await p.getDeliveryReports(["sms-1"])).toEqual([
+        { providerId: "sms-1", status: "DELIVERED" },
+      ]);
+    } finally {
+      global.fetch = original;
+    }
+  });
+  it("bounds large Arkesel delivery-report requests", async () => {
+    const original = global.fetch;
+    const sizes: number[] = [];
+    global.fetch = async (_input, init) => {
+      const ids = JSON.parse(String(init?.body)).msg_ids as string[];
+      sizes.push(ids.length);
+      return new Response(
+        JSON.stringify({
+          status: "success",
+          data: Object.fromEntries(
+            ids.map((id) => [id, { status: "DELIVERED" }]),
+          ),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    try {
+      const p = new ArkeselSmsProvider("secret", "SGH-KUTUNSE", false);
+      const reports = await p.getDeliveryReports(
+        Array.from({ length: 586 }, (_, index) => `sms-${index}`),
+      );
+      expect(sizes).toEqual([200, 200, 186]);
+      expect(reports).toHaveLength(586);
+    } finally {
+      global.fetch = original;
+    }
+  });
 });

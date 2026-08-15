@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   campaignSources,
   defaultFeedbackMessage,
@@ -215,6 +215,7 @@ export function FeedbackCampaignManager({
   const [tested, setTested] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const reconcileInFlight = useRef(false);
   const [audienceSummary, setAudienceSummary] =
     useState<AudienceSummary | null>(null);
   const [audienceLoading, setAudienceLoading] = useState(false);
@@ -785,28 +786,34 @@ export function FeedbackCampaignManager({
   }
 
   async function reconcile(campaign: Campaign) {
-    await run(async () => {
-      const result = await request(
-        `/api/admin/feedback/campaigns/${campaign.code}/reconcile`,
-        {},
-      );
-      const refreshed = await request(
-        `/api/admin/feedback/campaigns/${campaign.code}/status`,
-      );
-      setItems((old) =>
-        old.map((item) =>
-          item.code === campaign.code ? { ...item, ...refreshed } : item,
-        ),
-      );
-      setActive((current) =>
-        current?.code === campaign.code
-          ? { ...current, ...refreshed }
-          : current,
-      );
-      setNotice(
-        `Delivery status checked: ${result.updated} recipient status${result.updated === 1 ? "" : "es"} updated.`,
-      );
-    });
+    if (reconcileInFlight.current) return;
+    reconcileInFlight.current = true;
+    try {
+      await run(async () => {
+        const result = await request(
+          `/api/admin/feedback/campaigns/${campaign.code}/reconcile`,
+          {},
+        );
+        const refreshed = await request(
+          `/api/admin/feedback/campaigns/${campaign.code}/status`,
+        );
+        setItems((old) =>
+          old.map((item) =>
+            item.code === campaign.code ? { ...item, ...refreshed } : item,
+          ),
+        );
+        setActive((current) =>
+          current?.code === campaign.code
+            ? { ...current, ...refreshed }
+            : current,
+        );
+        setNotice(
+          `Delivery status checked: ${result.updated} recipient status${result.updated === 1 ? "" : "es"} updated.`,
+        );
+      });
+    } finally {
+      reconcileInFlight.current = false;
+    }
   }
 
   function reset() {
