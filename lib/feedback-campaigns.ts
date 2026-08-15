@@ -5,7 +5,7 @@ import { AGE_GROUPS, SMS_CONSENT_SCOPES } from "@/lib/contacts";
 import { campaignPurposes, maxSmsCharacters, unknownMergeFields } from "@/lib/sms-message";
 
 export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "custom_list", "other"] as const;
-export const defaultFeedbackMessage = "Satellite General Hospital: Thank you for allowing us to serve you. Please take 1-2 minutes to share your experience with us. Your feedback may be submitted anonymously. [SURVEY LINK]";
+export const defaultFeedbackMessage = "Thank you for visiting Satellite General Hospital. We value your experience. Please take 2 minutes to share your feedback with us: [SURVEY LINK]";
 
 const controlledMessage = z.string().trim().min(20).max(maxSmsCharacters).refine((value) => unknownMergeFields(value).length === 0, "Message contains an unsupported merge field.").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?|password|api key|firestore|member id|claim number)\b/i.test(value), "Message must not contain confidential clinical, insurance, credential, or internal identifier information.");
 export const campaignMessageSchema = z.strictObject({ message: controlledMessage, purpose: z.enum(campaignPurposes).default("feedback_request"), templateId: z.string().trim().max(80).default("patient_feedback"), messageMode: z.enum(["template", "custom"]).default("template") }).superRefine((value, context) => { if (value.purpose === "feedback_request" && !value.message.includes("[SURVEY LINK]")) context.addIssue({ code: "custom", path: ["message"], message: "Feedback Request messages must contain [SURVEY LINK]." }); });
