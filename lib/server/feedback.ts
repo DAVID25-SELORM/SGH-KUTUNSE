@@ -4,6 +4,7 @@ import { adminDb } from "./firebase-admin";
 import { createReference } from "@/lib/reference";
 import type { FeedbackInput } from "@/lib/validation";
 import { feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
+import { buildSubmissionSearchTerms } from "@/lib/submission-search";
 export function feedbackFlags(data: FeedbackInput) {
   const low =
     data.overallSatisfaction === "very_dissatisfied" ||
@@ -66,6 +67,7 @@ export async function createFeedback(data: FeedbackInput) {
           ...(verifiedCampaignId ? { campaign: verifiedCampaignId } : {}),
           ...feedbackFlags(data),
           reference,
+          searchTerms: buildSubmissionSearchTerms({ ...safe, campaign: verifiedCampaignId, reference }),
           status: "new",
           priority: feedbackFlags(data).needsReview ? "high" : "normal",
           assignedTo: null,

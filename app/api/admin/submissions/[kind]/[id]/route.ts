@@ -7,6 +7,7 @@ import { parseJson } from "@/lib/server/request";
 import { writeAudit } from "@/lib/server/audit";
 import { canMutate } from "@/lib/types/admin";
 import { canTransition, PRIORITIES, submissionKinds, SUBMISSION_STATUSES, type SubmissionKind, type SubmissionStatus } from "@/lib/types/submissions";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 const schema = z.strictObject({ status: z.enum(SUBMISSION_STATUSES).optional(), priority: z.enum(PRIORITIES).optional(), assignedTo: z.string().trim().max(128).nullable().optional(), note: z.string().trim().min(1).max(2000).optional() });
 const actionForStatus = (status: string, kind: string) => status === "contacted" ? "contacted" : status === "completed" ? "completed" : status === "archived" ? "archived" : status === "in_review" && kind === "feedback" ? "reviewed" : "status_changed";
@@ -17,8 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
   const config = submissionKinds[kind as SubmissionKind];
   const actor = await verifyAdminRequest(config.permission);
   if (!actor || !canMutate(actor.role)) return NextResponse.json({ ok: false }, { status: 403 });
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ ok: false }, { status: 403 });
+  if (!isTrustedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, schema); if (parsed.error) return parsed.error;
   const { note, ...requested } = parsed.data;
   const ref = adminDb.collection(config.collection).doc(id);

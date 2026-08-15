@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { contactSchema } from "../lib/validation";
 import { parseJson } from "../lib/server/request";
+import { isTrustedOrigin } from "../lib/server/origin";
 const valid={fullName:"Jane Visitor",phone:"024 000 0000",message:"Please contact me about visiting."};
 describe("server request boundary",()=>{it("accepts a bounded strict request",async()=>{const result=await parseJson(new Request("http://localhost/api/contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(valid)}),contactSchema);expect(result.error).toBeUndefined();expect(result.data?.fullName).toBe("Jane Visitor")});it("rejects wrong content types",async()=>{const result=await parseJson(new Request("http://localhost/api/contact",{method:"POST",body:"x"}),contactSchema);expect(result.error?.status).toBe(415)});it("rejects oversized payloads",async()=>{const result=await parseJson(new Request("http://localhost/api/contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...valid,message:"x".repeat(17000)})}),contactSchema);expect(result.error?.status).toBe(413)});it("rejects malformed JSON",async()=>{const result=await parseJson(new Request("http://localhost/api/contact",{method:"POST",headers:{"content-type":"application/json"},body:"{"}),contactSchema);expect(result.error?.status).toBe(400)})});
+
+describe("trusted admin origins", () => {
+  it("accepts both production custom and App Hosting domains", () => {
+    expect(isTrustedOrigin(new Request("https://runtime/api", { headers: { origin: "https://www.satellitegeneralhospital.com" } }))).toBe(true);
+    expect(isTrustedOrigin(new Request("https://runtime/api", { headers: { origin: "https://satellite-general-hospital--satelitegeneralhospital.us-east4.hosted.app" } }))).toBe(true);
+  });
+  it("rejects an unrelated production origin", () => {
+    expect(isTrustedOrigin(new Request("https://runtime/api", { headers: { origin: "https://evil.example" } }))).toBe(false);
+  });
+});
