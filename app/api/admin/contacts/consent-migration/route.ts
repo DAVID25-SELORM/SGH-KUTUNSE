@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { verifyAdminRequest } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
 import { adminDb } from "@/lib/server/firebase-admin";

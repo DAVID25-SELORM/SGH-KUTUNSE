@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 const text=(min:number,max:number)=>z.string().trim().min(min).max(max);
 const optional=(max:number)=>z.string().trim().max(max).optional().or(z.literal(""));
 const slug=z.string().trim().toLowerCase().min(2).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);

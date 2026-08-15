@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { campaignSources, defaultFeedbackMessage, parseRecipientImport } from "@/lib/feedback-campaigns";
+import { campaignSources, defaultFeedbackMessage, parseRecipientImport } from "@/lib/feedback-campaign-client";
 import { AGE_GROUPS } from "@/lib/contacts";
 import Link from "next/link";
 import { isDateWithinSmsPolicy, isTimeWithinSmsPolicy, smsPolicyLabel, type SmsPolicy } from "@/lib/sms-policy";

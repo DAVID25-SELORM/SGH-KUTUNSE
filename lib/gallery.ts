@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 export const galleryStatuses = ["draft", "published", "archived"] as const;
 export const galleryImageSchema = z.strictObject({

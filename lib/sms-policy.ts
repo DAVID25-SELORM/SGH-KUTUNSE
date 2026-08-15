@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 export const SMS_POLICY_TIMEZONE = "Africa/Accra" as const;
 

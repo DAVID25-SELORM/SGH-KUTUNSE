@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { normalizeGhanaPhone } from "./sms";
 
 export const AGE_GROUPS = ["under_18", "18_24", "25_34", "35_44", "45_54", "55_64", "65_plus"] as const;

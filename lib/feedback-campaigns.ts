@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
-import { deduplicateRecipients, normalizeGhanaPhone } from "@/lib/sms";
+import { z } from "@/lib/zod";
 import { AGE_GROUPS, SMS_CONSENT_SCOPES } from "@/lib/contacts";
 import { campaignPurposes, maxSmsCharacters, unknownMergeFields } from "@/lib/sms-message";
+import { campaignSources } from "@/lib/feedback-campaign-client";
 
-export const campaignSources = ["all_contacts", "staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "custom_list", "other"] as const;
-export const defaultFeedbackMessage = "Thank you for visiting Satellite General Hospital. We value your experience. Please take a minute or two to share your feedback with us: [SURVEY LINK]";
+export { campaignSources, defaultFeedbackMessage, parseRecipientImport } from "@/lib/feedback-campaign-client";
 
 const controlledMessage = z.string().trim().min(20).max(maxSmsCharacters).refine((value) => unknownMergeFields(value).length === 0, "Message contains an unsupported merge field.").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?|password|api key|firestore|member id|claim number)\b/i.test(value), "Message must not contain confidential clinical, insurance, credential, or internal identifier information.");
 export const campaignMessageSchema = z.strictObject({ message: controlledMessage, purpose: z.enum(campaignPurposes).default("feedback_request"), templateId: z.string().trim().max(80).default("patient_feedback"), messageMode: z.enum(["template", "custom"]).default("template") }).superRefine((value, context) => { if (value.purpose === "feedback_request" && !value.message.includes("[SURVEY LINK]")) context.addIssue({ code: "custom", path: ["message"], message: "Feedback Request messages must contain [SURVEY LINK]." }); });
@@ -38,12 +37,6 @@ export const feedbackContactSchema = z.strictObject({
   phone: z.string().trim().min(10).max(30),
   source: z.enum(["staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "other"]),
 });
-
-export function parseRecipientImport(value: string) {
-  const entries = value.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean);
-  const recipients = deduplicateRecipients(entries);
-  return { recipients, invalidCount: entries.filter((item) => !normalizeGhanaPhone(item)).length, duplicateCount: entries.length - entries.filter((item) => !normalizeGhanaPhone(item)).length - recipients.length };
-}
 
 export function recipientKey(phone: string) {
   return createHash("sha256").update(phone).digest("hex");
