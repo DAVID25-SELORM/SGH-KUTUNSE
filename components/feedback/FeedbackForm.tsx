@@ -60,7 +60,7 @@ export function FeedbackForm({ initialTracking }: { initialTracking: { campaign:
   });
   useEffect(() => {
     if (initialTracking.testToken) {
-      void fetch("/api/feedback/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: initialTracking.testToken }) });
+      void fetch("/api/feedback/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: initialTracking.testToken }) }).catch(() => { /* Server rendering already records the secure link open. */ });
     }
   }, [initialTracking.testToken]);
   const [visit, service, sat, receipt, contact] = useWatch({

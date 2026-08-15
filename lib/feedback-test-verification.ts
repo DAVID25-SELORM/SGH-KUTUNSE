@@ -49,6 +49,10 @@ export function hashFeedbackTestToken(token: string) {
   return createHash("sha256").update(token.trim()).digest("hex");
 }
 
+export function isCurrentFeedbackTestAttempt(campaign: Record<string, unknown>, token: Record<string, unknown>, tokenHash: string) {
+  return Boolean(tokenHash) && campaign.testTokenHash === tokenHash && Boolean(campaign.testSendAttemptId) && campaign.testSendAttemptId === token.attemptId;
+}
+
 export function feedbackTrackingFromSearchParams(params: Record<string, string | string[] | undefined>) {
   const value = (key: string) => typeof params[key] === "string" ? params[key] : "";
   const campaign = value("campaign").trim();

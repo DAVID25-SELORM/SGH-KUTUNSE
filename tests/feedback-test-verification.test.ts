@@ -6,6 +6,7 @@ import {
   feedbackTestVerifiedFields,
   feedbackTrackingFromSearchParams,
   hashFeedbackTestToken,
+  isCurrentFeedbackTestAttempt,
   validateFeedbackTestToken,
   validateCompletedFeedbackTest,
 } from "@/lib/feedback-test-verification";
@@ -22,6 +23,11 @@ const now = new Date("2026-08-15T04:00:00.000Z");
 const validRecord = { campaignId: "campaign-1", expiresAt: new Date("2026-08-16T04:00:00.000Z"), used: false };
 
 describe("feedback campaign test verification", () => {
+  it("accepts only the current campaign-bound test attempt", () => {
+    expect(isCurrentFeedbackTestAttempt({ testTokenHash: "hash", testSendAttemptId: "attempt-2" }, { attemptId: "attempt-2" }, "hash")).toBe(true);
+    expect(isCurrentFeedbackTestAttempt({ testTokenHash: "hash", testSendAttemptId: "attempt-2" }, { attemptId: "attempt-1" }, "hash")).toBe(false);
+    expect(isCurrentFeedbackTestAttempt({ testTokenHash: "new-hash", testSendAttemptId: "attempt-2" }, { attemptId: "attempt-2" }, "old-hash")).toBe(false);
+  });
   it("persists validated campaign and token query parameters in initial form state", () => {
     expect(feedbackTrackingFromSearchParams({ campaign: "campaign-1", t: "A".repeat(43), source: "sms" })).toEqual({ campaign: "campaign-1", testToken: "A".repeat(43), source: "sms" });
   });

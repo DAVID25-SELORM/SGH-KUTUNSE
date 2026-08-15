@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { createReference } from "@/lib/reference";
 import type { FeedbackInput } from "@/lib/validation";
-import { canVerifyFeedbackTestFromCampaignStatus, feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
+import { canVerifyFeedbackTestFromCampaignStatus, feedbackTestVerifiedFields, hashFeedbackTestToken, isCurrentFeedbackTestAttempt, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
 import { buildSubmissionSearchTerms } from "@/lib/submission-search";
 import { createSubmissionNotification } from "./notifications";
 export function feedbackFlags(data: FeedbackInput) {
@@ -54,6 +54,10 @@ export async function createFeedback(data: FeedbackInput) {
         const campaignSnapshot = campaignRef ? await t.get(campaignRef) : null;
         if (testTokenRef && !campaignSnapshot?.exists) {
           console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "campaign_not_found" });
+          throw new Error("INVALID_TEST_TOKEN");
+        }
+        if (testTokenRef && !isCurrentFeedbackTestAttempt(campaignSnapshot?.data() ?? {}, testTokenSnapshot?.data() ?? {}, testTokenHash)) {
+          console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "not_current_attempt" });
           throw new Error("INVALID_TEST_TOKEN");
         }
         if (testTokenRef && !canVerifyFeedbackTestFromCampaignStatus(campaignSnapshot?.data()?.status)) {
