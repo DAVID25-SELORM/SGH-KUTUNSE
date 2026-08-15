@@ -37,7 +37,8 @@ function relativeTime(value: string | null) {
 }
 
 function diagnostic(event: string) {
-  console.info(`[SGH notifications] ${event}`);
+  if (process.env.NODE_ENV !== "production")
+    console.info(`[SGH notifications] ${event}`);
 }
 
 export function AdminNotifications() {
@@ -48,6 +49,8 @@ export function AdminNotifications() {
   const [soundBlocked, setSoundBlocked] = useState(false);
   const initialized = useRef(false);
   const loadInProgress = useRef(false);
+  const consecutiveFailures = useRef(0);
+  const authenticationExpired = useRef(false);
   const soundRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -99,15 +102,27 @@ export function AdminNotifications() {
   );
 
   const load = useCallback(async () => {
-    if (loadInProgress.current) return;
+    if (authenticationExpired.current) return false;
+    if (loadInProgress.current) return false;
+    if (!navigator.onLine) {
+      consecutiveFailures.current = 4;
+      return false;
+    }
     loadInProgress.current = true;
     try {
       const response = await fetch("/api/admin/notifications", {
         cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
+      if (response.status === 401 || response.status === 403) {
+        authenticationExpired.current = true;
+        window.location.replace("/admin/login?reason=session_expired");
+        return false;
+      }
       if (!response.ok) {
         diagnostic(`notification refresh failed: HTTP ${response.status}`);
-        return;
+        consecutiveFailures.current += 1;
+        return false;
       }
       const next = (await response.json()) as Payload;
       const seen = readSeenNotificationIds(localStorage.getItem(seenKey));
@@ -126,10 +141,14 @@ export function AdminNotifications() {
       localStorage.setItem(seenKey, JSON.stringify([...seen].slice(-300)));
       initialized.current = true;
       setData(next);
+      consecutiveFailures.current = 0;
+      return true;
     } catch (error) {
+      consecutiveFailures.current += 1;
       diagnostic(
         `notification refresh unavailable${error instanceof Error ? `: ${error.name}` : ""}`,
       );
+      return false;
     } finally {
       loadInProgress.current = false;
     }
@@ -144,14 +163,35 @@ export function AdminNotifications() {
     diagnostic(
       enabled ? "notification sound enabled" : "notification sound disabled",
     );
-    const initial = window.setTimeout(() => {
+    let stopped = false;
+    let timer = 0;
+    const poll = async () => {
+      const refreshed = await load();
+      if (stopped || authenticationExpired.current) return;
+      const delay = refreshed
+        ? 3_000
+        : Math.min(
+            60_000,
+            3_000 * 2 ** Math.min(consecutiveFailures.current, 4),
+          );
+      timer = window.setTimeout(poll, delay);
+    };
+    const resume = () => {
+      if (loadInProgress.current) return;
+      window.clearTimeout(timer);
+      void poll();
+    };
+    timer = window.setTimeout(() => {
       setSound(enabled);
-      void load();
+      void poll();
     }, 0);
-    const timer = window.setInterval(() => void load(), 3000);
+    window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
     return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
+      stopped = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("online", resume);
+      window.removeEventListener("focus", resume);
       audio.pause();
       audioRef.current = null;
     };

@@ -1,40 +1,122 @@
 "use client";
 
 import { useState } from "react";
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
+import {
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
-export function LoginForm() {
+export function LoginForm({
+  initialMessage = "",
+}: {
+  initialMessage?: string;
+}) {
   const router = useRouter();
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   async function submit(formData: FormData) {
-    setBusy(true); setMessage("");
+    setBusy(true);
+    setMessage("");
     try {
-      if (!firebaseAuth) throw new Error("Firebase Authentication is not configured.");
-      const credential = await signInWithEmailAndPassword(firebaseAuth, String(formData.get("email")), String(formData.get("password")));
+      if (!firebaseAuth)
+        throw new Error("Firebase Authentication is not configured.");
+      const credential = await signInWithEmailAndPassword(
+        firebaseAuth,
+        String(formData.get("email")),
+        String(formData.get("password")),
+      );
       const idToken = await credential.user.getIdToken();
-      const response = await fetch("/api/auth/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) });
+      const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Sign-in failed.");
-      router.push("/admin"); router.refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Sign-in failed."); }
-    finally { setBusy(false); }
+      router.push("/admin");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Sign-in failed.");
+    } finally {
+      setBusy(false);
+    }
   }
   async function reset(formData: FormData) {
     const email = String(formData.get("email") ?? "").trim();
-    if (!email || !firebaseAuth) { setMessage("Enter your administrator email first."); return; }
-    try { await sendPasswordResetEmail(firebaseAuth, email); setMessage("If the account is eligible, Firebase has sent password-reset instructions."); }
-    catch { setMessage("Password reset could not be requested. Contact a super administrator."); }
+    if (!email || !firebaseAuth) {
+      setMessage("Enter your administrator email first.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email);
+      setMessage(
+        "If the account is eligible, Firebase has sent password-reset instructions.",
+      );
+    } catch {
+      setMessage(
+        "Password reset could not be requested. Contact a super administrator.",
+      );
+    }
   }
-  return <form action={submit} className="flex flex-col gap-5">
-    <label className="text-sm font-semibold">Email<input name="email" type="email" required autoComplete="username" className="mt-2 w-full rounded-xl border border-border-default px-4 py-3" /></label>
-    <label className="text-sm font-semibold">Password<span className="relative mt-2 block"><input name="password" type={showPassword ? "text" : "password"} required autoComplete="current-password" className="w-full rounded-xl border border-border-default py-3 pr-12 pl-4" /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-text-muted hover:text-purple-deep">{showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}</button></span></label>
-    {message && <p className="rounded-xl bg-bg-soft p-3 text-sm" role="status">{message}</p>}
-    <button disabled={busy} className="rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Signing in…" : "Sign in"}</button>
-    <button type="button" onClick={(event) => reset(new FormData(event.currentTarget.form!))} className="text-sm font-semibold text-purple-deep">Reset password</button>
-  </form>;
+  return (
+    <form action={submit} className="flex flex-col gap-5">
+      <label className="text-sm font-semibold">
+        Email
+        <input
+          name="email"
+          type="email"
+          required
+          autoComplete="username"
+          className="mt-2 w-full rounded-xl border border-border-default px-4 py-3"
+        />
+      </label>
+      <label className="text-sm font-semibold">
+        Password
+        <span className="relative mt-2 block">
+          <input
+            name="password"
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            className="w-full rounded-xl border border-border-default py-3 pr-12 pl-4"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-text-muted hover:text-purple-deep"
+          >
+            {showPassword ? (
+              <EyeOff className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Eye className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </span>
+      </label>
+      {message && (
+        <p className="rounded-xl bg-bg-soft p-3 text-sm" role="status">
+          {message}
+        </p>
+      )}
+      <button
+        disabled={busy}
+        className="rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white disabled:opacity-50"
+      >
+        {busy ? "Signing in…" : "Sign in"}
+      </button>
+      <button
+        type="button"
+        onClick={(event) => reset(new FormData(event.currentTarget.form!))}
+        className="text-sm font-semibold text-purple-deep"
+      >
+        Reset password
+      </button>
+    </form>
+  );
 }

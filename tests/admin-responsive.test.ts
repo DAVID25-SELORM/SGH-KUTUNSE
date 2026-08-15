@@ -15,6 +15,21 @@ describe("admin mobile responsiveness", () => {
     expect(notifications).toContain('aria-label="Close notifications"');
   });
 
+  it("handles transient notification network failures without tight polling", () => {
+    const notifications = component("AdminNotifications.tsx");
+    const history = component("AdminNotificationHistory.tsx");
+    expect(notifications).toContain("consecutiveFailures");
+    expect(notifications).toContain("Math.min(");
+    expect(notifications).toContain(
+      'window.addEventListener("online", resume)',
+    );
+    expect(notifications).toContain("AbortSignal.timeout(10_000)");
+    expect(notifications).toContain("authenticationExpired");
+    expect(notifications).toContain("/admin/login?reason=session_expired");
+    expect(history).toContain("connection was interrupted");
+    expect(history).toContain("catch {");
+  });
+
   it("prevents the shared admin shell from widening the phone viewport", () => {
     const shell = component("AdminShell.tsx");
     expect(shell).toContain("min-h-screen overflow-x-hidden");

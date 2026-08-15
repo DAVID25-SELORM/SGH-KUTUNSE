@@ -8,12 +8,26 @@ export function AdminNotificationHistory() {
   const [items, setItems] = useState<AdminNotification[]>([]),
     [state, setState] = useState("all"),
     [type, setType] = useState("all"),
-    [date, setDate] = useState("");
+    [date, setDate] = useState(""),
+    [notice, setNotice] = useState("");
   async function load() {
-    const response = await fetch("/api/admin/notifications", {
-      cache: "no-store",
-    });
-    if (response.ok) setItems((await response.json()).items);
+    if (!navigator.onLine) return false;
+    try {
+      const response = await fetch("/api/admin/notifications", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status === 401 || response.status === 403) {
+        window.location.replace("/admin/login?reason=session_expired");
+        return false;
+      }
+      if (!response.ok) return false;
+      setItems((await response.json()).items);
+      setNotice("");
+      return true;
+    } catch {
+      return false;
+    }
   }
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -30,15 +44,32 @@ export function AdminNotificationHistory() {
     [items, state, type, date],
   );
   async function mark(body: object) {
-    await fetch("/api/admin/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    await load();
+    try {
+      const response = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status === 401 || response.status === 403) {
+        window.location.replace("/admin/login?reason=session_expired");
+        return;
+      }
+      if (!response.ok) throw new Error("Notification update failed.");
+      await load();
+    } catch {
+      setNotice(
+        "The notification could not be updated because the connection was interrupted. Please try again.",
+      );
+    }
   }
   return (
     <div className="mt-6">
+      {notice && (
+        <p role="status" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm">
+          {notice}
+        </p>
+      )}
       <div className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-4">
         <select
           value={state}
