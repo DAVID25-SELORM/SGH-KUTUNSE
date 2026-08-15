@@ -15,3 +15,16 @@ export const notificationCopy: Record<NotificationType, { title: string; body: s
 export function notificationTarget(kind: SubmissionKind, documentId: string) {
   return `/admin/${kind}/${encodeURIComponent(documentId)}`;
 }
+
+export function readSeenNotificationIds(value: string | null) {
+  try {
+    const parsed = JSON.parse(value ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export function firstUnseenNotificationId(ids: string[], seen: Set<string>) {
+  return ids.find((id) => !seen.has(id));
+}
