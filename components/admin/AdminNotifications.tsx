@@ -29,6 +29,7 @@ export function AdminNotifications() {
   const [open, setOpen] = useState(false); const [toast, setToast] = useState<AdminNotification | null>(null);
   const [sound, setSound] = useState(false); const [soundBlocked, setSoundBlocked] = useState(false);
   const initialized = useRef(false);
+  const loadInProgress = useRef(false);
   const soundRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -59,16 +60,25 @@ export function AdminNotifications() {
   }, [playSound]);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/notifications", { cache: "no-store" }); if (!response.ok) return;
-    const next = await response.json() as Payload;
-    const seen = readSeenNotificationIds(localStorage.getItem(seenKey));
-    if (initialized.current) {
-      const newestId = firstUnseenNotificationId(next.items.map((item) => item.id), seen);
-      const newest = next.items.find((item) => item.id === newestId);
-      if (newest) { setToast(newest); if (soundRef.current) await playNewNotificationOnce(newest.id); }
+    if (loadInProgress.current) return;
+    loadInProgress.current = true;
+    try {
+      const response = await fetch("/api/admin/notifications", { cache: "no-store" });
+      if (!response.ok) { diagnostic(`notification refresh failed: HTTP ${response.status}`); return; }
+      const next = await response.json() as Payload;
+      const seen = readSeenNotificationIds(localStorage.getItem(seenKey));
+      if (initialized.current) {
+        const newestId = firstUnseenNotificationId(next.items.map((item) => item.id), seen);
+        const newest = next.items.find((item) => item.id === newestId);
+        if (newest) { setToast(newest); if (soundRef.current) await playNewNotificationOnce(newest.id); }
+      }
+      next.items.forEach((item) => seen.add(item.id)); localStorage.setItem(seenKey, JSON.stringify([...seen].slice(-300)));
+      initialized.current = true; setData(next);
+    } catch (error) {
+      diagnostic(`notification refresh unavailable${error instanceof Error ? `: ${error.name}` : ""}`);
+    } finally {
+      loadInProgress.current = false;
     }
-    next.items.forEach((item) => seen.add(item.id)); localStorage.setItem(seenKey, JSON.stringify([...seen].slice(-300)));
-    initialized.current = true; setData(next);
   }, [playNewNotificationOnce]);
   useEffect(() => {
     const audio = new Audio("/notification-tone.wav"); audio.preload = "auto"; audio.volume = 0.45; audioRef.current = audio;
@@ -79,7 +89,15 @@ export function AdminNotifications() {
     return () => { window.clearTimeout(initial); window.clearInterval(timer); audio.pause(); audioRef.current = null; };
   }, [load]);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(null), 8000); return () => window.clearTimeout(timer); }, [toast]);
-  async function markRead(id: string) { await fetch("/api/admin/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); setData((old) => ({ unread: Math.max(0, old.unread - (old.items.find((item) => item.id === id)?.read ? 0 : 1)), items: old.items.map((item) => item.id === id ? { ...item, read: true } : item) })); }
+  async function markRead(id: string) {
+    try {
+      const response = await fetch("/api/admin/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!response.ok) { diagnostic(`mark read failed: HTTP ${response.status}`); return; }
+      setData((old) => ({ unread: Math.max(0, old.unread - (old.items.find((item) => item.id === id)?.read ? 0 : 1)), items: old.items.map((item) => item.id === id ? { ...item, read: true } : item) }));
+    } catch (error) {
+      diagnostic(`mark read unavailable${error instanceof Error ? `: ${error.name}` : ""}`);
+    }
+  }
   async function setSoundPreference(enabled: boolean, confirmWithSound = false) {
     soundRef.current = enabled; setSound(enabled); localStorage.setItem(soundKey, enabled ? "on" : "off");
     diagnostic(enabled ? "notification sound enabled" : "notification sound disabled");
