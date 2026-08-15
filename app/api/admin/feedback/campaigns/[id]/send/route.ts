@@ -16,6 +16,7 @@ import { loadCampaignAudience } from "@/lib/server/campaign-audience";
 import { getSmsPolicy } from "@/lib/server/sms-settings";
 import { isDateWithinSmsPolicy, smsPolicyRestrictionMessage } from "@/lib/sms-policy";
 import { resolveSmsMessage } from "@/lib/sms-message";
+import { canReserveFeedbackTestSms } from "@/lib/feedback-test-verification";
 
 export const maxDuration = 300;
 
@@ -73,17 +74,46 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!phone || parsed.data.confirmation !== "SEND TEST") return NextResponse.json({ ok: false, message: "Enter a valid Ghana number and type SEND TEST." }, { status: 400 });
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
+    const tokenRef = adminDb.collection("feedback_test_tokens").doc(tokenHash);
+    const attemptId = randomBytes(16).toString("hex");
     const testLink = campaignLink(id, String(campaign.source), token);
     const currentMessageHash = createHash("sha256").update(String(campaign.message)).digest("hex");
     if (campaign.messageHash && campaign.messageHash !== currentMessageHash) return NextResponse.json({ ok: false, message: "The saved message version is invalid. Save it again before testing." }, { status: 409 });
     const message = resolveSmsMessage(String(campaign.message), testLink);
-    const result = await provider.sendMessage(phone, message, `test-${id}-${Date.now()}`);
-    if (result.status === "failed") return NextResponse.json({ ok: false, message: "The test SMS was not accepted by Arkesel." }, { status: 502 });
-    const batch = adminDb.batch();
-    batch.set(adminDb.collection("feedback_test_tokens").doc(tokenHash), { campaignId: id, recipientHash: createHash("sha256").update(phone).digest("hex"), expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), createdAt: FieldValue.serverTimestamp(), openedAt: null, submittedAt: null, used: false });
+    const reserved = await adminDb.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(ref);
+      if (!fresh.exists) return false;
+      const data = fresh.data()!;
+      if (!canReserveFeedbackTestSms(data)) return false;
+      const freshMessageHash = createHash("sha256").update(String(data.message ?? "")).digest("hex");
+      if (freshMessageHash !== currentMessageHash || (data.messageHash && data.messageHash !== freshMessageHash)) return false;
+      transaction.create(tokenRef, { campaignId: id, attemptId, recipientHash: createHash("sha256").update(phone).digest("hex"), expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), createdAt: FieldValue.serverTimestamp(), openedAt: null, submittedAt: null, used: false });
+      transaction.update(ref, { status: "test_sending", testSendState: "sending", testSendAttemptId: attemptId, testSendStartedAt: FieldValue.serverTimestamp(), testedMessageHash: currentMessageHash, updatedAt: FieldValue.serverTimestamp() });
+      return true;
+    });
+    if (!reserved) return NextResponse.json({ ok: false, message: "A Test SMS is already in progress or was already accepted. Do not send it again." }, { status: 409 });
+    console.info("feedback_test_sms", { event: "provider_request_started", campaignId: id });
+    const result = await provider.sendMessage(phone, message, `test-${id}-${attemptId}`);
+    if (result.status === "failed") {
+      const rejected = result.failureClass === "rejected";
+      await adminDb.runTransaction(async (transaction) => {
+        const fresh = await transaction.get(ref);
+        if (fresh.data()?.testSendAttemptId !== attemptId) return;
+        transaction.update(ref, { status: rejected ? "ready" : "test_delivery_unknown", testSendState: rejected ? "rejected" : "delivery_unknown", testSendCompletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+        if (rejected) transaction.update(tokenRef, { used: true, invalidatedAt: FieldValue.serverTimestamp(), invalidationReason: "provider_rejected" });
+      });
+      console.warn("feedback_test_sms", { event: rejected ? "provider_rejected" : "provider_outcome_unknown", campaignId: id });
+      return NextResponse.json({ ok: false, message: rejected ? "Arkesel rejected the Test SMS. Review the provider configuration before trying again." : "Arkesel's response could not be confirmed. Do not resend: the SMS may have been delivered. If it arrived, use its secure link to complete verification." }, { status: rejected ? 502 : 409 });
+    }
     const feedbackWorkflow = String(campaign.purpose ?? "feedback_request") === "feedback_request";
-    batch.update(ref, { status: feedbackWorkflow ? "test_sent" : "test_verified", testedMessageHash: currentMessageHash, testSmsAcceptedAt: FieldValue.serverTimestamp(), testLinkOpenedAt: null, testFeedbackSubmittedAt: null, testVerifiedAt: feedbackWorkflow ? null : FieldValue.serverTimestamp(), testVerified: !feedbackWorkflow, updatedAt: FieldValue.serverTimestamp() });
-    await batch.commit();
+    await adminDb.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(ref);
+      if (fresh.data()?.testSendAttemptId !== attemptId) throw new Error("TEST_SEND_ATTEMPT_CHANGED");
+      const alreadyVerified = fresh.data()?.testVerified === true;
+      const linkOpened = Boolean(fresh.data()?.testLinkOpenedAt);
+      transaction.update(ref, { status: alreadyVerified ? "test_verified" : feedbackWorkflow ? (linkOpened ? "test_link_opened" : "test_sent") : "test_verified", testedMessageHash: currentMessageHash, testSmsAcceptedAt: FieldValue.serverTimestamp(), testProviderId: result.providerId, testSendState: "accepted", testSendCompletedAt: FieldValue.serverTimestamp(), testVerifiedAt: feedbackWorkflow ? (fresh.data()?.testVerifiedAt ?? null) : FieldValue.serverTimestamp(), testVerified: alreadyVerified || !feedbackWorkflow, updatedAt: FieldValue.serverTimestamp() });
+    });
+    console.info("feedback_test_sms", { event: "provider_accepted", campaignId: id, providerIdPresent: Boolean(result.providerId) });
     await writeAudit(actor.uid, `feedback_campaign.${provider.mode}_test`, "feedback_campaign", id);
     return NextResponse.json({ ok: true, status: feedbackWorkflow ? "test_sent" : "test_verified", testVerified: !feedbackWorkflow, mode: provider.mode });
   }

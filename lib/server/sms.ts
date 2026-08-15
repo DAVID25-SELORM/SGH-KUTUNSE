@@ -6,6 +6,10 @@ type ArkeselResponse = {
   data?: Array<{ recipient?: string; id?: string }>;
 };
 
+function comparablePhone(value: string) {
+  return value.replace(/\D/g, "").replace(/^0/, "233");
+}
+
 export type ArkeselDeliveryReport = { providerId: string; status: string };
 
 export class ArkeselSmsProvider implements SmsProvider {
@@ -39,23 +43,25 @@ export class ArkeselSmsProvider implements SmsProvider {
         return recipients.map(() => ({
           providerId: "",
           status: "failed" as const,
+          failureClass: response.status >= 500 ? ("delivery_unknown" as const) : ("rejected" as const),
         }));
       }
       const payload = (await response.json()) as ArkeselResponse;
-      if (payload.status !== "success") throw new Error("Arkesel rejected the request.");
+      if (payload.status !== "success") return recipients.map(() => ({ providerId: "", status: "failed" as const, failureClass: "rejected" as const }));
       const byRecipient = new Map(
-        (payload.data ?? []).map((item) => [item.recipient?.replace(/^\+/, ""), item.id]),
+        (payload.data ?? []).map((item) => [comparablePhone(item.recipient ?? ""), item.id]),
       );
-      return recipients.map((recipient) => {
-        const providerId = byRecipient.get(recipient.replace(/^\+/, ""));
+      return recipients.map((recipient, index) => {
+        const providerId = byRecipient.get(comparablePhone(recipient)) ?? (payload.data?.length === recipients.length ? payload.data[index]?.id : undefined);
         return providerId
           ? { providerId, status: this.mode === "sandbox" ? ("mocked" as const) : ("accepted" as const) }
-          : { providerId: "", status: "failed" as const };
+          : { providerId: "", status: "failed" as const, failureClass: "delivery_unknown" as const };
       });
     } catch {
       return recipients.map(() => ({
         providerId: "",
         status: "failed" as const,
+        failureClass: "delivery_unknown" as const,
       }));
     }
   }

@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { createReference } from "@/lib/reference";
 import type { FeedbackInput } from "@/lib/validation";
-import { feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
+import { canVerifyFeedbackTestFromCampaignStatus, feedbackTestVerifiedFields, hashFeedbackTestToken, validateFeedbackTestToken } from "@/lib/feedback-test-verification";
 import { buildSubmissionSearchTerms } from "@/lib/submission-search";
 import { createSubmissionNotification } from "./notifications";
 export function feedbackFlags(data: FeedbackInput) {
@@ -56,7 +56,7 @@ export async function createFeedback(data: FeedbackInput) {
           console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "campaign_not_found" });
           throw new Error("INVALID_TEST_TOKEN");
         }
-        if (testTokenRef && !["test_sent", "test_link_opened"].includes(String(campaignSnapshot?.data()?.status ?? ""))) {
+        if (testTokenRef && !canVerifyFeedbackTestFromCampaignStatus(campaignSnapshot?.data()?.status)) {
           console.warn("feedback_test_verification", { event: "submission_rejected", campaignId: verifiedCampaignId, reason: "invalid_campaign_state" });
           throw new Error("INVALID_TEST_TOKEN");
         }

@@ -57,3 +57,11 @@ export function feedbackTestVerifiedFields(reference: string, feedbackId: string
     updatedAt: timestamp,
   };
 }
+
+export function canVerifyFeedbackTestFromCampaignStatus(status: unknown) {
+  return ["test_sending", "test_delivery_unknown", "test_sent", "test_link_opened"].includes(String(status ?? ""));
+}
+
+export function canReserveFeedbackTestSms(data: Record<string, unknown>) {
+  return !data.testSmsAcceptedAt && !["sending", "delivery_unknown"].includes(String(data.testSendState ?? ""));
+}

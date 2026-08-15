@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canVerifyFeedbackTestFromCampaignStatus,
+  canReserveFeedbackTestSms,
   feedbackTestOpenedFields,
   feedbackTestVerifiedFields,
   feedbackTrackingFromSearchParams,
@@ -48,9 +50,22 @@ describe("feedback campaign test verification", () => {
     expect(validateFeedbackTestToken({ ...validRecord, used: true }, "campaign-1", now).ok).toBe(false);
   });
 
+  it("keeps an ambiguously delivered reserved link verifiable without permitting a resend", () => {
+    expect(canVerifyFeedbackTestFromCampaignStatus("test_sending")).toBe(true);
+    expect(canVerifyFeedbackTestFromCampaignStatus("test_delivery_unknown")).toBe(true);
+    expect(canVerifyFeedbackTestFromCampaignStatus("ready")).toBe(false);
+  });
+
+  it("permits only one provider attempt until the reserved outcome is resolved", () => {
+    expect(canReserveFeedbackTestSms({ status: "ready" })).toBe(true);
+    expect(canReserveFeedbackTestSms({ status: "test_sending", testSendState: "sending" })).toBe(false);
+    expect(canReserveFeedbackTestSms({ status: "test_delivery_unknown", testSendState: "delivery_unknown" })).toBe(false);
+    expect(canReserveFeedbackTestSms({ status: "test_sent", testSendState: "accepted", testSmsAcceptedAt: now })).toBe(false);
+  });
+
   it("projects an immediately verified admin status with no-store headers", () => {
     const status = campaignVerificationStatus({ status: "test_verified", testSmsAcceptedAt: now, testLinkOpenedAt: now, testFeedbackSubmittedAt: now, testVerified: true });
-    expect(status).toEqual({ status: "test_verified", testSmsAccepted: true, testLinkOpened: true, testFeedbackSubmitted: true, testVerified: true });
+    expect(status).toEqual({ status: "test_verified", testSmsAccepted: true, testLinkOpened: true, testFeedbackSubmitted: true, testVerified: true, testSendState: "" });
     expect(campaignStatusNoStoreHeaders["Cache-Control"]).toContain("no-store");
   });
 

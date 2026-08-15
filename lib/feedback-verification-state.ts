@@ -5,6 +5,7 @@ export function campaignVerificationStatus(data: Record<string, unknown>) {
     testLinkOpened: Boolean(data.testLinkOpenedAt),
     testFeedbackSubmitted: Boolean(data.testFeedbackSubmittedAt),
     testVerified: data.testVerified === true,
+    testSendState: String(data.testSendState ?? ""),
   };
 }
 

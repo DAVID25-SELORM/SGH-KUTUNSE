@@ -1,6 +1,7 @@
 export type SmsResult = {
   providerId: string;
   status: "mocked" | "accepted" | "failed";
+  failureClass?: "rejected" | "delivery_unknown";
 };
 export interface SmsProvider {
   mode: "mock" | "sandbox" | "live";
