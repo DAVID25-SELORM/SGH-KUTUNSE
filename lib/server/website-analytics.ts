@@ -6,6 +6,8 @@ import { adminDb } from "@/lib/server/firebase-admin";
 
 const DATA_API = "https://analyticsdata.googleapis.com/v1beta";
 const TIME_ZONE = "Africa/Accra";
+const DATA_API_TIMEOUT_MS = 12_000;
+const REPORT_TIMEOUT_MS = 20_000;
 
 export type AnalyticsPreset =
   "today" | "yesterday" | "7days" | "30days" | "month" | "custom";
@@ -186,6 +188,7 @@ async function accessToken() {
 async function query(
   endpoint: "runReport" | "runRealtimeReport",
   body: object,
+  token: string,
 ): Promise<Report> {
   const propertyId = process.env.GA4_PROPERTY_ID?.trim();
   if (!propertyId || !/^\d+$/.test(propertyId))
@@ -195,10 +198,11 @@ async function query(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${await accessToken()}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(DATA_API_TIMEOUT_MS),
       next: { revalidate: endpoint === "runRealtimeReport" ? 60 : 900 },
     },
   );
@@ -213,6 +217,7 @@ async function historical(
   range: AnalyticsRange,
   dimensions: string[],
   metrics: string[],
+  token: string,
   limit = 100,
 ) {
   return query("runReport", {
@@ -223,7 +228,7 @@ async function historical(
     orderBys: metrics.length
       ? [{ metric: { metricName: metrics[0] }, desc: true }]
       : undefined,
-  });
+  }, token);
 }
 
 const forms = [
@@ -292,6 +297,7 @@ export async function getWebsiteAnalytics(
     };
   }
   try {
+    const token = await accessToken();
     const [
       summaryReport,
       trendReport,
@@ -301,7 +307,8 @@ export async function getWebsiteAnalytics(
       geoReport,
       realtimeReport,
       submissions,
-    ] = await Promise.all([
+    ] = await Promise.race([
+      Promise.all([
       historical(
         range,
         [],
@@ -313,34 +320,51 @@ export async function getWebsiteAnalytics(
           "newUsers",
           "returningUsers",
         ],
+        token,
       ),
       historical(
         range,
         ["date"],
         ["activeUsers", "sessions", "screenPageViews"],
+        token,
         400,
       ),
       historical(
         range,
         ["pagePath", "pageTitle"],
         ["screenPageViews", "activeUsers", "userEngagementDuration"],
+        token,
         100,
       ),
       historical(
         range,
         ["sessionDefaultChannelGroup", "sessionSourceMedium"],
         ["sessions", "activeUsers"],
+        token,
         50,
       ),
-      historical(range, ["deviceCategory"], ["activeUsers", "sessions"], 10),
-      historical(range, ["country", "region"], ["activeUsers"], 50),
+      historical(
+        range,
+        ["deviceCategory"],
+        ["activeUsers", "sessions"],
+        token,
+        10,
+      ),
+      historical(range, ["country", "region"], ["activeUsers"], token, 50),
       query("runRealtimeReport", {
         metrics: [{ name: "activeUsers" }],
         minuteRanges: [
           { name: "last_30_minutes", startMinutesAgo: 29, endMinutesAgo: 0 },
         ],
-      }),
+      }, token),
       submissionCounts(range),
+      ]),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Analytics report timed out")),
+          REPORT_TIMEOUT_MS,
+        ),
+      ),
     ]);
     const total = summaryReport.rows?.[0] ?? summaryReport.totals?.[0];
     const pageRows = pagesReport.rows ?? [];

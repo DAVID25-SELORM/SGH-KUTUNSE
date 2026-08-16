@@ -49,4 +49,15 @@ describe("website analytics administration", () => {
     expect(page).toContain("Analytics data is temporarily unavailable.");
     expect(page).toContain('requireAdmin("analytics_view")');
   });
+
+  it("bounds report latency and reuses one GA access token", () => {
+    const source = readFileSync(
+      join(process.cwd(), "lib/server/website-analytics.ts"),
+      "utf8",
+    );
+    expect(source).toContain("AbortSignal.timeout(DATA_API_TIMEOUT_MS)");
+    expect(source).toContain("Analytics report timed out");
+    expect(source).toContain("const token = await accessToken()");
+    expect(source).toContain("Authorization: `Bearer ${token}`");
+  });
 });
