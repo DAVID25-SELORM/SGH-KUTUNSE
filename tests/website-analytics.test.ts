@@ -32,6 +32,15 @@ describe("website analytics administration", () => {
     expect(tracker).not.toMatch(/logEvent\([^)]*["']page_view/);
   });
 
+  it("connects App Hosting to the existing Firebase-linked GA4 property", () => {
+    const hosting = readFileSync(
+      join(process.cwd(), "apphosting.yaml"),
+      "utf8",
+    );
+    expect(hosting).toContain("GA4_PROPERTY_ID");
+    expect(hosting).toContain('value: "549140369"');
+  });
+
   it("shows unavailable data rather than fabricated zero traffic", () => {
     const page = readFileSync(
       join(process.cwd(), "app/admin/(secure)/analytics/page.tsx"),

@@ -34,6 +34,10 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: GA4_PROPERTY_ID
+    value: "549140369"
+    availability:
+      - RUNTIME
   - variable: REQUIRE_FIREBASE_APP_CHECK
     value: "false"
     availability:
