@@ -36,7 +36,15 @@ const groups: Array<{
 }> = [
   {
     label: "Overview",
-    items: [{ href: "/admin", label: "Dashboard", icon: BarChart3 }],
+    items: [
+      { href: "/admin", label: "Dashboard", icon: BarChart3 },
+      {
+        href: "/admin/analytics",
+        label: "Website analytics",
+        icon: BarChart3,
+        permission: "analytics_view",
+      },
+    ],
   },
   {
     label: "Requests",

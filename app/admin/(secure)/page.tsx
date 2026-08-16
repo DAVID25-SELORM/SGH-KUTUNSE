@@ -4,11 +4,18 @@ import { adminDb } from "@/lib/server/firebase-admin";
 import { submissionKinds } from "@/lib/types/submissions";
 import { calculateDashboardStats, dateFromRecord } from "@/lib/dashboard-stats";
 import { hasPermission } from "@/lib/types/admin";
+import {
+  getWebsiteAnalytics,
+  resolveAnalyticsRange,
+} from "@/lib/server/website-analytics";
 
 export default async function Dashboard() {
   const session = await requireAdmin();
   const now = new Date();
   const followUpHours = Math.max(1, Number(process.env.FOLLOW_UP_HOURS ?? 48));
+  const analytics = hasPermission(session.roles, "analytics_view")
+    ? await getWebsiteAnalytics(resolveAnalyticsRange("today"))
+    : null;
   const [cards, scheduled, activity] = await Promise.all([
     Promise.all(
       Object.entries(submissionKinds).map(async ([kind, c]) => {
@@ -47,8 +54,8 @@ export default async function Dashboard() {
       const type = String(doc.get("type"));
       return (
         type in submissionKinds &&
-      hasPermission(
-        session.roles,
+        hasPermission(
+          session.roles,
           submissionKinds[type as keyof typeof submissionKinds].permission,
         )
       );
@@ -106,6 +113,35 @@ export default async function Dashboard() {
               : "No campaign scheduled"}
           </p>
         </Link>
+        {analytics ? (
+          <Link
+            href="/admin/analytics?range=today"
+            className="rounded-2xl bg-white p-6 shadow-sm"
+          >
+            <p className="text-sm text-text-muted">Website today</p>
+            {analytics.available ? (
+              <>
+                <p className="mt-2 text-4xl font-semibold text-purple-deep">
+                  {analytics.summary.visitors}
+                  <span className="ml-2 text-xs font-medium text-text-muted">
+                    visitors
+                  </span>
+                </p>
+                <p className="mt-4 text-sm">
+                  {analytics.summary.pageViews} page views ·{" "}
+                  {analytics.summary.activeRecently} active recently
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-text-muted">
+                Analytics reporting is not yet connected.
+              </p>
+            )}
+            <p className="mt-3 text-sm font-semibold text-purple-deep">
+              View analytics
+            </p>
+          </Link>
+        ) : null}
       </div>
       <p className="mt-5 text-sm text-text-muted">
         Follow-up means new or in-review for more than {followUpHours} hours.

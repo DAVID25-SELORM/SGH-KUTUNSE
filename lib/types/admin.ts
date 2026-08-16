@@ -27,7 +27,8 @@ export type Permission =
   | "contacts"
   | "contacts_manage"
   | "sms_settings_view"
-  | "sms_settings_write";
+  | "sms_settings_write"
+  | "analytics_view";
 
 const grants: Record<AdminRole, readonly Permission[]> = {
   super_admin: [
@@ -48,6 +49,7 @@ const grants: Record<AdminRole, readonly Permission[]> = {
     "contacts_manage",
     "sms_settings_view",
     "sms_settings_write",
+    "analytics_view",
   ],
   admin: [
     "appointments",
@@ -63,6 +65,7 @@ const grants: Record<AdminRole, readonly Permission[]> = {
     "contacts",
     "contacts_manage",
     "sms_settings_view",
+    "analytics_view",
   ],
   reception: [
     "appointments",
@@ -82,6 +85,7 @@ const grants: Record<AdminRole, readonly Permission[]> = {
     "corporate",
     "telemedicine",
     "feedback",
+    "analytics_view",
   ],
 };
 
