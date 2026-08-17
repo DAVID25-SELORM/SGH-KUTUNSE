@@ -60,4 +60,13 @@ describe("website analytics administration", () => {
     expect(source).toContain("const token = await accessToken()");
     expect(source).toContain("Authorization: `Bearer ${token}`");
   });
+
+  it("requests only supported GA4 user metrics", () => {
+    const source = readFileSync(
+      join(process.cwd(), "lib/server/website-analytics.ts"),
+      "utf8",
+    );
+    expect(source).not.toContain('"returningUsers"');
+    expect(source).toContain("numberAt(total, 1) - numberAt(total, 4)");
+  });
 });

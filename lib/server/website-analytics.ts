@@ -318,7 +318,6 @@ export async function getWebsiteAnalytics(
           "screenPageViews",
           "sessions",
           "newUsers",
-          "returningUsers",
         ],
         token,
       ),
@@ -388,7 +387,10 @@ export async function getWebsiteAnalytics(
         pageViews: numberAt(total, 2),
         sessions: numberAt(total, 3),
         newVisitors: numberAt(total, 4),
-        returningVisitors: numberAt(total, 5),
+        returningVisitors: Math.max(
+          numberAt(total, 1) - numberAt(total, 4),
+          0,
+        ),
         activeRecently: numberAt(
           realtimeReport.rows?.[0] ?? realtimeReport.totals?.[0],
           0,
