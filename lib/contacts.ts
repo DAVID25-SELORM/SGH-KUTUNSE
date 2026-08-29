@@ -2,15 +2,15 @@ import { z } from "@/lib/zod";
 import { normalizeGhanaPhone } from "./sms";
 
 export const AGE_GROUPS = ["under_18", "18_24", "25_34", "35_44", "45_54", "55_64", "65_plus"] as const;
-export const CONTACT_SOURCES = ["staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "other"] as const;
+export const CONTACT_SOURCES = ["staff", "health_screening", "facility", "outpatient", "reception", "laboratory", "pharmacy", "corporate", "insurance", "telemedicine", "general_contact", "other"] as const;
 export const GENDERS = ["", "female", "male", "other", "prefer_not_to_say"] as const;
 export const SMS_CONSENT_SCOPES = ["feedback_request", "health_screening_followup", "service_followup"] as const;
 export const SMS_CONSENT_STATUSES = ["unknown", "opted_in", "opted_out"] as const;
 
 export const contactSchema = z.strictObject({
-  fullName: z.string().trim().max(120).default(""), phone: z.string().trim().min(10).max(30), email: z.union([z.literal(""), z.email()]).default(""),
+  fullName: z.string().trim().min(1, "Full name is required.").max(120), phone: z.string().trim().min(10).max(30), email: z.union([z.literal(""), z.email()]).default(""),
   gender: z.enum(GENDERS).default(""), dateOfBirth: z.string().trim().max(10).default(""), age: z.union([z.literal(""), z.coerce.number().int().min(0).max(125)]).default(""), ageGroup: z.enum(["", ...AGE_GROUPS]).default(""),
-  source: z.enum(CONTACT_SOURCES), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(30).default([]),
+  source: z.enum(CONTACT_SOURCES), sourceLabel: z.string().trim().max(80).default(""), facility: z.string().trim().max(160).default(""), group: z.string().trim().max(160).default(""), tags: z.array(z.string().trim().min(1).max(60)).max(30).default([]),
   smsOptIn: z.boolean().default(false), smsConsentStatus: z.enum(SMS_CONSENT_STATUSES).default("unknown"), smsConsentSource: z.enum(["", ...CONTACT_SOURCES]).default(""), smsConsentScope: z.array(z.enum(SMS_CONSENT_SCOPES)).max(3).default([]), smsConsentDate: z.string().trim().max(10).default(""), smsConsentEvidenceNote: z.string().trim().max(500).default(""), emailOptIn: z.boolean().default(false), doNotContact: z.boolean().default(false), notes: z.string().trim().max(3000).default(""), status: z.enum(["active", "archived"]).default("active"),
 });
 export const contactMergeSchema = z.strictObject({ targetId: z.string().regex(/^[a-f0-9]{64}$/) });
@@ -27,7 +27,7 @@ export function prepareContact(input: z.output<typeof contactSchema>) {
   const normalizedPhone = normalizeGhanaPhone(input.phone); if (!normalizedPhone) throw new Error("Enter a valid Ghana mobile number.");
   const derived = input.dateOfBirth ? deriveAge(input.dateOfBirth) : null; if (input.dateOfBirth && derived === null) throw new Error("Enter a valid date of birth.");
   const age = derived ?? (input.age === "" ? null : input.age); const ageGroup = age !== null ? ageGroupFor(age) : input.ageGroup;
-  return { ...input, phone: normalizedPhone, normalizedPhone, age, ageGroup, sources: [input.source], tags: [...new Set(input.tags.map(tag => tag.toLowerCase()))] };
+  return { ...input, sourceLabel: input.source === "other" ? input.sourceLabel : "", phone: normalizedPhone, normalizedPhone, age, ageGroup, sources: [input.source], tags: [...new Set(input.tags.map(tag => tag.toLowerCase()))] };
 }
 
 export type SmsConsentScope = (typeof SMS_CONSENT_SCOPES)[number];

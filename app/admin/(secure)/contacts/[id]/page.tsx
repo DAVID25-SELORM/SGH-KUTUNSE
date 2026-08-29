@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { serialize } from "@/lib/server/admin-data";
 import { hasPermission } from "@/lib/types/admin";
+import { humanizeFeedbackValue } from "@/lib/feedback-display";
 export default async function ContactPage({
   params,
 }: {
@@ -16,7 +17,7 @@ export default async function ContactPage({
   const ref = adminDb.collection("feedback_contacts").doc(id),
     doc = await ref.get();
   if (!doc.exists) notFound();
-  const data = { id, ...serialize(doc.data()!) };
+  const data = { id, ...serialize(doc.data()!) } as Record<string, unknown> & { id: string };
   const [campaigns, audit] = await Promise.all([
     adminDb
       .collectionGroup("recipients")
@@ -54,6 +55,7 @@ export default async function ContactPage({
         <p className="mt-2 break-all text-xs text-text-muted">
           Contact ID: {id}
         </p>
+        <p className="mt-2 text-sm"><strong>Contact Category:</strong> {humanizeFeedbackValue(data.source)}{data.source === "other" && data.sourceLabel ? ` — ${String(data.sourceLabel)}` : ""}</p>
       </div>
       {hasPermission(session.roles, "contacts_manage") ? (
         <div className="mt-6">

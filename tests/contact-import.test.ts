@@ -1,0 +1,17 @@
+import { describe, expect, it } from "vitest";
+import { autoMapContactColumns, importRequestSchema, validateContactImport } from "@/lib/contact-import";
+import { recipientKey } from "@/lib/feedback-campaigns";
+
+const request = (overrides: Record<string, unknown> = {}) => importRequestSchema.parse({ filename:"contacts.csv", rows:[{"Full Name":"Ama Mensah",Mobile:"0241234567",Category:"Health Screening"}], mapping:{fullName:"Full Name",phone:"Mobile",source:"Category"}, categoryMode:"file", existingMode:"skip", consentMode:"none", ...overrides });
+
+describe("contact import", () => {
+  it("auto maps common headings", () => expect(autoMapContactColumns(["Full Name","Telephone","Screening Event","SMS Consent"])).toMatchObject({ fullName:"Full Name",phone:"Telephone",facility:"Screening Event",consent:"SMS Consent" }));
+  it("normalizes categories and Ghana phones", () => { const rows=validateContactImport(request(),new Set(),recipientKey); expect(rows[0]).toMatchObject({state:"new",contact:{source:"health_screening",normalizedPhone:"+233241234567"}}); });
+  it("applies one controlled category to every row", () => { const rows=validateContactImport(request({categoryMode:"all",category:"facility"}),new Set(),recipientKey); expect(rows[0].contact?.source).toBe("facility"); });
+  it("flags unknown categories", () => { const rows=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"0241234567",Category:"Uncontrolled"}]}),new Set(),recipientKey); expect(rows[0]).toMatchObject({state:"invalid"}); expect(rows[0].reasons.join()).toContain("Invalid category"); });
+  it("deduplicates equivalent phone formats within a file", () => { const rows=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"0241234567",Category:"Staff"},{"Full Name":"Ama again",Mobile:"+233241234567",Category:"Staff"}]}),new Set(),recipientKey); expect(rows.map(x=>x.state)).toEqual(["new","duplicate"]); });
+  it("identifies existing normalized contacts", () => { const id=recipientKey("+233241234567"); expect(validateContactImport(request(),new Set([id]),recipientKey)[0].state).toBe("existing"); });
+  it("rejects invalid phone, email and missing name", () => { const rows=validateContactImport(request({rows:[{"Full Name":"",Mobile:"bad",Category:"Staff",Email:"bad"}],mapping:{fullName:"Full Name",phone:"Mobile",source:"Category",email:"Email"}}),new Set(),recipientKey); expect(rows[0].state).toBe("invalid"); expect(rows[0].reasons.join()).toContain("Missing full name"); });
+  it("does not infer consent from a phone number", () => expect(validateContactImport(request(),new Set(),recipientKey)[0].contact).toMatchObject({smsOptIn:false,smsConsentStatus:"unknown"}));
+  it("requires evidence for imported affirmative consent", () => { const rows=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"0241234567",Category:"Staff",Consent:"Yes"}],mapping:{fullName:"Full Name",phone:"Mobile",source:"Category",consent:"Consent"},consentMode:"file"}),new Set(),recipientKey); expect(rows[0].state).toBe("invalid"); expect(rows[0].reasons.join()).toContain("Verified consent requires"); });
+});

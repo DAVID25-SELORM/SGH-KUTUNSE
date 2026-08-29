@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContactEditor } from "@/components/admin/ContactEditor";
+import { ContactImporter } from "@/components/admin/ContactImporter";
 import {
   AGE_GROUPS,
   CONTACT_SOURCES,
@@ -136,7 +137,8 @@ export default async function ContactsPage({
         · {smsEligible} SMS eligible
       </p>
       {manage ? (
-        <details className="mt-6">
+        <div className="mt-6 flex flex-wrap items-start gap-3">
+        <details>
           <summary className="cursor-pointer rounded-xl bg-purple-deep px-5 py-3 font-semibold text-white">
             Add contact
           </summary>
@@ -144,6 +146,8 @@ export default async function ContactsPage({
             <ContactEditor />
           </div>
         </details>
+        <ContactImporter isSuperAdmin={session.roles.includes("super_admin")} />
+        </div>
       ) : null}
       <form className="mt-6 grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-4">
         <input
@@ -157,7 +161,7 @@ export default async function ContactsPage({
           defaultValue={filters.source ?? ""}
           className="rounded-xl border px-3 py-2"
         >
-          <option value="">All sources</option>
+          <option value="">All categories</option>
           {CONTACT_SOURCES.map((item) => (
             <option key={item} value={item}>
               {humanizeFeedbackValue(item)}
@@ -242,7 +246,7 @@ export default async function ContactsPage({
             <thead className="bg-bg-soft">
               <tr>
                 <th className="p-4">Contact</th>
-                <th>Source</th>
+                <th>Category</th>
                 <th>Demographics</th>
                 <th>Consent</th>
                 <th>Status</th>
@@ -263,7 +267,7 @@ export default async function ContactsPage({
                       {String(contact.email ?? "")}
                     </p>
                   </td>
-                  <td>{humanizeFeedbackValue(contact.source)}</td>
+                  <td>{humanizeFeedbackValue(contact.source)}{contact.source === "other" && contact.sourceLabel ? ` — ${String(contact.sourceLabel)}` : ""}</td>
                   <td>
                     {humanizeFeedbackValue(contact.gender)} ·{" "}
                     {humanizeFeedbackValue(contact.ageGroup)}

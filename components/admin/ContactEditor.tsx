@@ -45,6 +45,7 @@ export function ContactEditor({
       age: fd.get("age"),
       ageGroup: fd.get("ageGroup"),
       source: fd.get("source"),
+      sourceLabel: fd.get("sourceLabel"),
       facility: fd.get("facility"),
       group: fd.get("group"),
       tags: String(fd.get("tags") ?? "")
@@ -54,7 +55,9 @@ export function ContactEditor({
       smsOptIn: optedIn,
       smsConsentStatus: optedIn
         ? String(initial.smsConsentStatus ?? "opted_in")
-        : "opted_out",
+        : id
+          ? "opted_out"
+          : "unknown",
       smsConsentSource: String(
         initial.smsConsentSource ?? (optedIn ? fd.get("source") : ""),
       ),
@@ -118,6 +121,7 @@ export function ContactEditor({
             name="fullName"
             defaultValue={String(initial.fullName ?? initial.name ?? "")}
             maxLength={120}
+            required
             className={field}
           />
         </label>
@@ -194,7 +198,7 @@ export function ContactEditor({
           </select>
         </label>
         <label className="text-sm font-semibold">
-          Primary source
+          Contact Category
           <select
             name="source"
             defaultValue={String(initial.source ?? "other")}
@@ -206,6 +210,10 @@ export function ContactEditor({
               </option>
             ))}
           </select>
+        </label>
+        <label className="text-sm font-semibold">
+          Other category label (optional)
+          <input name="sourceLabel" defaultValue={String(initial.sourceLabel ?? "")} maxLength={80} className={field} />
         </label>
         <label className="text-sm font-semibold">
           Facility / screening event
