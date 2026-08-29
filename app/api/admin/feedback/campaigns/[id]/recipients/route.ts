@@ -26,8 +26,15 @@ export async function GET(
   const snapshot = await campaignRef
     .collection("recipients")
     .orderBy("createdAt", "desc")
-    .limit(100)
+    .limit(5_000)
     .get();
+  await writeAudit(
+    actor.uid,
+    "feedback_campaign.delivery_results_viewed",
+    "feedback_campaign",
+    id,
+    { recipientCount: String(snapshot.size) },
+  );
   return NextResponse.json({
     ok: true,
     recipients: snapshot.docs.map((document) => ({
@@ -35,8 +42,9 @@ export async function GET(
       phone: maskPhone(String(document.data().phone ?? "")),
       status: String(document.data().status ?? "unknown"),
       attemptCount: Number(document.data().attemptCount ?? 0),
+      errorClass: String(document.data().errorClass ?? ""),
     })),
-    limited: snapshot.size === 100,
+    limited: snapshot.size === 5_000,
   });
 }
 

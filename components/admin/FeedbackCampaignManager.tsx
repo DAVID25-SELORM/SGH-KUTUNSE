@@ -82,6 +82,19 @@ type Preparation = AudienceSummary & {
   queued: number;
   existingCampaignRecipients: number;
 };
+type RecipientResult = {
+  id: string;
+  phone: string;
+  status: string;
+  attemptCount: number;
+  errorClass: string;
+};
+type RecipientResultState = {
+  loading: boolean;
+  error: string;
+  recipients: RecipientResult[];
+  limited: boolean;
+};
 const activeCampaignKey = "sgh-active-feedback-campaign";
 type CampaignConfirmation =
   | { kind: "send"; finalCount: number; excluded: number }
@@ -231,6 +244,9 @@ export function FeedbackCampaignManager({
     null,
   );
   const [smsPolicy, setSmsPolicy] = useState(initialSmsPolicy);
+  const [recipientResults, setRecipientResults] = useState<
+    Record<string, RecipientResultState>
+  >({});
   const [gender, setGender] = useState("all"),
     [ageGroups, setAgeGroups] = useState<string[]>([]),
     [facility, setFacility] = useState(""),
@@ -815,6 +831,77 @@ export function FeedbackCampaignManager({
       reconcileInFlight.current = false;
     }
   }
+
+  async function loadRecipientResults(campaign: Campaign) {
+    const existing = recipientResults[campaign.code];
+    if (existing?.loading) return;
+    if (existing?.recipients.length) {
+      setRecipientResults((current) => {
+        const next = { ...current };
+        delete next[campaign.code];
+        return next;
+      });
+      return;
+    }
+    setRecipientResults((current) => ({
+      ...current,
+      [campaign.code]: {
+        loading: true,
+        error: "",
+        recipients: [],
+        limited: false,
+      },
+    }));
+    try {
+      const response = await fetch(
+        `/api/admin/feedback/campaigns/${campaign.code}/recipients`,
+        { cache: "no-store" },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.message ?? "Could not load recipient results.");
+      setRecipientResults((current) => ({
+        ...current,
+        [campaign.code]: {
+          loading: false,
+          error: "",
+          recipients: result.recipients ?? [],
+          limited: result.limited === true,
+        },
+      }));
+    } catch (error) {
+      setRecipientResults((current) => ({
+        ...current,
+        [campaign.code]: {
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not load recipient results.",
+          recipients: [],
+          limited: false,
+        },
+      }));
+    }
+  }
+
+  const recipientStatus = (status: string) => {
+    if (status === "delivered")
+      return { label: "Received (confirmed)", style: "bg-green-100 text-green-900" };
+    if (status === "failed")
+      return { label: "Not received (failed)", style: "bg-red-100 text-red-900" };
+    if (status === "opted_out")
+      return { label: "Not sent (opted out)", style: "bg-slate-200 text-slate-900" };
+    if (status === "queued")
+      return { label: "Not sent yet", style: "bg-blue-100 text-blue-900" };
+    if (["sent", "accepted"].includes(status))
+      return { label: "Sent; receipt unconfirmed", style: "bg-amber-100 text-amber-950" };
+    if (["interrupted_delivery_unknown", "sending"].includes(status))
+      return { label: "Delivery unknown", style: "bg-orange-100 text-orange-950" };
+    if (status === "mocked")
+      return { label: "Test only—not delivered", style: "bg-purple-100 text-purple-900" };
+    return { label: status.replaceAll("_", " "), style: "bg-slate-100 text-slate-900" };
+  };
 
   function reset() {
     localStorage.removeItem(activeCampaignKey);
@@ -1873,6 +1960,43 @@ export function FeedbackCampaignManager({
                 Sent means provider accepted. Delivered requires Arkesel/carrier
                 confirmation. Unknown messages are not automatically retried.
               </p>
+              <button
+                onClick={() => loadRecipientResults(campaign)}
+                className="mt-3 rounded-lg border border-purple-deep px-3 py-2 text-sm font-semibold text-purple-deep"
+              >
+                {recipientResults[campaign.code]?.recipients.length
+                  ? "Hide recipient results"
+                  : recipientResults[campaign.code]?.loading
+                    ? "Loading recipient results…"
+                    : "View who received SMS"}
+              </button>
+              {recipientResults[campaign.code]?.error && (
+                <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+                  {recipientResults[campaign.code].error}
+                </p>
+              )}
+              {recipientResults[campaign.code]?.recipients.length > 0 && (
+                <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border bg-white">
+                  <div className="sticky top-0 grid grid-cols-[1fr_auto] gap-3 border-b bg-bg-soft p-3 text-xs font-semibold">
+                    <span>Recipient</span>
+                    <span>Delivery result</span>
+                  </div>
+                  {recipientResults[campaign.code].recipients.map((recipient) => {
+                    const result = recipientStatus(recipient.status);
+                    return (
+                      <div key={recipient.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b p-3 text-sm last:border-b-0">
+                        <span className="font-mono">{recipient.phone}</span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${result.style}`} title={recipient.errorClass || undefined}>
+                          {result.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {recipientResults[campaign.code].limited && (
+                    <p className="p-3 text-xs text-text-muted">Showing the first 5,000 recipients.</p>
+                  )}
+                </div>
+              )}
             </article>
           ))}
         </div>
