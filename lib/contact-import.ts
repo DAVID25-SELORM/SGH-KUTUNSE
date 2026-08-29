@@ -7,8 +7,8 @@ export const MAX_IMPORT_ROWS = 5000;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 const aliases: Record<ImportField, string[]> = {
-  fullName: ["name", "full name", "fullname", "contact name"], firstName: ["first name", "firstname", "given name"], lastName: ["last name", "lastname", "surname"],
-  phone: ["phone", "phone number", "telephone", "mobile", "mobile number", "tel"], email: ["email", "email address"], gender: ["gender", "sex"], age: ["age"], dateOfBirth: ["date of birth", "dob", "birth date"],
+  fullName: ["name", "full name", "fullname", "contact name", "patient name"], firstName: ["first name", "firstname", "given name"], lastName: ["last name", "lastname", "surname"],
+  phone: ["phone", "phone number", "telephone", "mobile", "mobile number", "tel", "contact", "contact number"], email: ["email", "email address"], gender: ["gender", "sex"], age: ["age", "age in years"], dateOfBirth: ["date of birth", "dob", "birth date"],
   source: ["category", "contact category", "source"], facility: ["facility", "screening event", "event"], group: ["group", "department"], tags: ["tags", "tag"], consent: ["consent", "sms consent", "sms opt in"],
   consentSource: ["consent source"], consentScope: ["consent scope", "scope"], consentEvidence: ["consent evidence", "evidence", "reference note"], notes: ["notes", "note"],
 };
@@ -29,6 +29,25 @@ export type ContactImportRow = { rowNumber: number; state: "new" | "existing" | 
 
 function value(row: Record<string, unknown>, mapping: Partial<Record<ImportField, string>>, field: ImportField) { const heading = mapping[field]; return heading ? String(row[heading] ?? "").trim() : ""; }
 const categoryValue = (raw: string) => normal(raw).replaceAll(" ", "_");
+export function normalizeImportedAge(raw: string) {
+  const value = raw.trim();
+  if (!value) return "";
+  const match = value.match(/^(\d{1,3})(?:\s*(?:years?|yrs?|y\/o|yo))?$/i);
+  return match ? match[1] : value;
+}
+function importErrorMessage(error: unknown) {
+  if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : "Invalid contact";
+  return error.issues.map((issue) => {
+    const field = String(issue.path[0] ?? "");
+    if (field === "age") return "Age must be 0–125, for example 37 or 37 years.";
+    if (field === "email") return "Email address is invalid.";
+    if (field === "gender") return "Gender must be Female, Male, Other, Prefer Not To Say, or blank.";
+    if (field === "fullName") return "Full name is required.";
+    if (field === "phone") return "Enter a complete Ghana phone number.";
+    if (field === "dateOfBirth") return "Date of birth must use YYYY-MM-DD.";
+    return issue.message;
+  }).join("; ");
+}
 export function validateContactImport(input: ContactImportRequest, existingIds = new Set<string>(), idForPhone: (phone: string) => string): ContactImportRow[] {
   const seen = new Set<string>();
   return input.rows.map((raw, index) => {
@@ -37,6 +56,8 @@ export function validateContactImport(input: ContactImportRequest, existingIds =
     if (!CONTACT_SOURCES.includes(sourceRaw as (typeof CONTACT_SOURCES)[number])) reasons.push(sourceRaw ? `Invalid category: ${sourceRaw}` : "Missing category");
     const fullName = value(raw, input.mapping, "fullName") || [value(raw, input.mapping, "firstName"), value(raw, input.mapping, "lastName")].filter(Boolean).join(" ");
     if (!fullName) reasons.push("Missing full name");
+    const phone = value(raw, input.mapping, "phone");
+    if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(phone)) reasons.push("Phone number is in scientific notation. In Excel, format the phone column as Text and re-export so no digits are lost.");
     const affirmative = /^(yes|true|1|opted[_ -]?in|consented)$/i.test(value(raw, input.mapping, "consent"));
     const fileConsentSource = categoryValue(value(raw, input.mapping, "consentSource"));
     const fileConsentScope = categoryValue(value(raw, input.mapping, "consentScope"));
@@ -47,10 +68,10 @@ export function validateContactImport(input: ContactImportRequest, existingIds =
     if (optedIn && (!consentSource || !CONTACT_SOURCES.includes(consentSource as never) || !consentScope || !SMS_CONSENT_SCOPES.includes(consentScope as never) || !evidence)) reasons.push("Verified consent requires valid source, scope and evidence");
     let contact: ReturnType<typeof prepareContact> | undefined;
     try {
-      const parsed = contactSchema.parse({ fullName, phone: value(raw, input.mapping, "phone"), email: value(raw, input.mapping, "email"), gender: categoryValue(value(raw, input.mapping, "gender")), dateOfBirth: value(raw, input.mapping, "dateOfBirth"), age: value(raw, input.mapping, "age"), ageGroup: "", source: sourceRaw, sourceLabel: sourceRaw === "other" ? input.sourceLabel : "", facility: value(raw, input.mapping, "facility"), group: value(raw, input.mapping, "group"), tags: value(raw, input.mapping, "tags").split(/[,;]/).map(x => x.trim()).filter(Boolean), smsOptIn: optedIn, smsConsentStatus: optedIn ? "opted_in" : "unknown", smsConsentSource: optedIn ? consentSource : "", smsConsentScope: optedIn ? [consentScope] : [], smsConsentDate: "", smsConsentEvidenceNote: optedIn ? evidence : "", emailOptIn: false, doNotContact: false, notes: value(raw, input.mapping, "notes"), status: "active" });
+      const parsed = contactSchema.parse({ fullName, phone, email: value(raw, input.mapping, "email"), gender: categoryValue(value(raw, input.mapping, "gender")), dateOfBirth: value(raw, input.mapping, "dateOfBirth"), age: normalizeImportedAge(value(raw, input.mapping, "age")), ageGroup: "", source: sourceRaw, sourceLabel: sourceRaw === "other" ? input.sourceLabel : "", facility: value(raw, input.mapping, "facility"), group: value(raw, input.mapping, "group"), tags: value(raw, input.mapping, "tags").split(/[,;]/).map(x => x.trim()).filter(Boolean), smsOptIn: optedIn, smsConsentStatus: optedIn ? "opted_in" : "unknown", smsConsentSource: optedIn ? consentSource : "", smsConsentScope: optedIn ? [consentScope] : [], smsConsentDate: "", smsConsentEvidenceNote: optedIn ? evidence : "", emailOptIn: false, doNotContact: false, notes: value(raw, input.mapping, "notes"), status: "active" });
       contact = prepareContact(parsed);
-    } catch (error) { reasons.push(error instanceof Error ? error.message : "Invalid contact"); }
-    if (reasons.length || !contact) return { rowNumber, state: "invalid", reasons };
+    } catch (error) { reasons.push(importErrorMessage(error)); }
+    if (reasons.length || !contact) return { rowNumber, state: "invalid", reasons: [...new Set(reasons)] };
     const id = idForPhone(contact.normalizedPhone);
     if (seen.has(id)) return { rowNumber, state: "duplicate", id, contact, reasons: ["Duplicate phone number within file"] };
     seen.add(id);

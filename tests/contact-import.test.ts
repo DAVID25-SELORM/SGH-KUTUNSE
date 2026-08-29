@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { autoMapContactColumns, importRequestSchema, validateContactImport } from "@/lib/contact-import";
+import { autoMapContactColumns, importRequestSchema, normalizeImportedAge, validateContactImport } from "@/lib/contact-import";
 import { recipientKey } from "@/lib/feedback-campaigns";
 
 const request = (overrides: Record<string, unknown> = {}) => importRequestSchema.parse({ filename:"contacts.csv", rows:[{"Full Name":"Ama Mensah",Mobile:"0241234567",Category:"Health Screening"}], mapping:{fullName:"Full Name",phone:"Mobile",source:"Category"}, categoryMode:"file", existingMode:"skip", consentMode:"none", ...overrides });
 
 describe("contact import", () => {
   it("auto maps common headings", () => expect(autoMapContactColumns(["Full Name","Telephone","Screening Event","SMS Consent"])).toMatchObject({ fullName:"Full Name",phone:"Telephone",facility:"Screening Event",consent:"SMS Consent" }));
+  it("auto maps patient exports and accepts human-readable ages", () => { expect(autoMapContactColumns(["Patient Name","Contact","Age"])).toMatchObject({fullName:"Patient Name",phone:"Contact",age:"Age"}); expect(normalizeImportedAge("37 years")).toBe("37"); expect(normalizeImportedAge("8 yrs")).toBe("8"); const rows=validateContactImport(request({rows:[{"Patient Name":"Ama Mensah",Contact:"0241234567",Age:"37 years",Category:"Health Screening"}],mapping:{fullName:"Patient Name",phone:"Contact",age:"Age",source:"Category"}}),new Set(),recipientKey); expect(rows[0]).toMatchObject({state:"new",contact:{age:37}}); });
+  it("explains scientific-notation phone loss without exposing raw schema errors", () => { const row=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"2.33E+11",Category:"Staff"}]}),new Set(),recipientKey)[0]; expect(row.state).toBe("invalid"); expect(row.reasons.join()).toContain("scientific notation"); expect(row.reasons.join()).not.toContain("invalid_union"); });
+  it("returns a readable age validation message", () => { const row=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"0241234567",Category:"Staff",Age:"unknown"}],mapping:{fullName:"Full Name",phone:"Mobile",source:"Category",age:"Age"}}),new Set(),recipientKey)[0]; expect(row.reasons).toEqual(["Age must be 0–125, for example 37 or 37 years."]); });
   it("normalizes categories and Ghana phones", () => { const rows=validateContactImport(request(),new Set(),recipientKey); expect(rows[0]).toMatchObject({state:"new",contact:{source:"health_screening",normalizedPhone:"+233241234567"}}); });
   it("applies one controlled category to every row", () => { const rows=validateContactImport(request({categoryMode:"all",category:"facility"}),new Set(),recipientKey); expect(rows[0].contact?.source).toBe("facility"); });
   it("flags unknown categories", () => { const rows=validateContactImport(request({rows:[{"Full Name":"Ama",Mobile:"0241234567",Category:"Uncontrolled"}]}),new Set(),recipientKey); expect(rows[0]).toMatchObject({state:"invalid"}); expect(rows[0].reasons.join()).toContain("Invalid category"); });
