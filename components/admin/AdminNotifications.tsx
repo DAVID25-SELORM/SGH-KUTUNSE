@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Bell, Volume2, VolumeX, X } from "lucide-react";
 import {
   firstUnseenNotificationId,
+  notificationReadEvent,
+  type NotificationReadDetail,
   readSeenNotificationIds,
 } from "@/lib/notifications";
 
@@ -221,6 +223,20 @@ export function AdminNotifications() {
       window.removeEventListener("pointerdown", close);
     };
   }, [open]);
+  useEffect(() => {
+    const synchronizeReadState = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReadDetail>).detail;
+      setData((old) => {
+        const items = old.items.map((item) =>
+          detail?.all || item.id === detail?.id ? { ...item, read: true } : item,
+        );
+        return { items, unread: items.filter((item) => !item.read).length };
+      });
+    };
+    window.addEventListener(notificationReadEvent, synchronizeReadState);
+    return () =>
+      window.removeEventListener(notificationReadEvent, synchronizeReadState);
+  }, []);
   async function markRead(id: string) {
     try {
       const response = await fetch("/api/admin/notifications", {
@@ -241,9 +257,36 @@ export function AdminNotifications() {
           item.id === id ? { ...item, read: true } : item,
         ),
       }));
+      window.dispatchEvent(
+        new CustomEvent<NotificationReadDetail>(notificationReadEvent, {
+          detail: { id },
+        }),
+      );
     } catch (error) {
       diagnostic(
         `mark read unavailable${error instanceof Error ? `: ${error.name}` : ""}`,
+      );
+    }
+  }
+  async function markAllRead() {
+    try {
+      const response = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      if (!response.ok) {
+        diagnostic(`mark all read failed: HTTP ${response.status}`);
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent<NotificationReadDetail>(notificationReadEvent, {
+          detail: { all: true },
+        }),
+      );
+    } catch (error) {
+      diagnostic(
+        `mark all read unavailable${error instanceof Error ? `: ${error.name}` : ""}`,
       );
     }
   }
@@ -314,6 +357,14 @@ export function AdminNotifications() {
             >
               Test sound
             </button>
+            {data.unread > 0 && (
+              <button
+                onClick={() => void markAllRead()}
+                className="rounded-lg bg-purple-deep px-3 py-2 text-sm font-semibold text-white"
+              >
+                Mark all as read
+              </button>
+            )}
             {soundBlocked && (
               <button
                 onClick={() => void setSoundPreference(true, true)}
@@ -332,10 +383,13 @@ export function AdminNotifications() {
                   void markRead(item.id);
                   setOpen(false);
                 }}
-                className={`block rounded-xl p-3 hover:bg-bg-soft ${item.read ? "opacity-70" : "bg-purple-50"}`}
+                className={`relative block rounded-xl border p-3 transition-colors hover:bg-bg-soft ${item.read ? "border-transparent bg-white text-text-muted opacity-75" : "border-purple-300 bg-purple-50 text-purple-deep shadow-sm"}`}
               >
-                <span className="block break-words font-semibold">
-                  {item.title}
+                <span className="flex items-center justify-between gap-3">
+                  <span className="block break-words font-semibold">{item.title}</span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${item.read ? "bg-slate-100 text-slate-500" : "bg-pink-accent text-white"}`}>
+                    {item.read ? "Read" : "Unread"}
+                  </span>
                 </span>
                 <span className="mt-1 block break-all text-sm">
                   {item.reference}

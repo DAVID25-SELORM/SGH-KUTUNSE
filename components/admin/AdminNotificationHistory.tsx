@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { AdminNotification } from "./AdminNotifications";
-import { notificationTypes } from "@/lib/notifications";
+import { notificationReadEvent, notificationTypes, type NotificationReadDetail } from "@/lib/notifications";
 
 export function AdminNotificationHistory() {
   const [items, setItems] = useState<AdminNotification[]>([]),
@@ -56,6 +56,9 @@ export function AdminNotificationHistory() {
         return;
       }
       if (!response.ok) throw new Error("Notification update failed.");
+      const detail: NotificationReadDetail = "all" in body ? { all: true } : { id: String((body as { id?: unknown }).id ?? "") };
+      setItems((current) => current.map((item) => detail.all || item.id === detail.id ? { ...item, read: true } : item));
+      window.dispatchEvent(new CustomEvent<NotificationReadDetail>(notificationReadEvent, { detail }));
       await load();
     } catch {
       setNotice(
@@ -109,11 +112,14 @@ export function AdminNotificationHistory() {
         {visible.map((item) => (
           <article
             key={item.id}
-            className={`rounded-2xl border bg-white p-4 ${item.read ? "" : "border-purple-deep"}`}
+            className={`rounded-2xl border p-4 transition-colors ${item.read ? "border-slate-200 bg-slate-50 text-text-muted" : "border-purple-deep bg-purple-50 shadow-sm ring-1 ring-purple-200"}`}
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <strong className="block break-words">{item.title}</strong>
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className={`block break-words ${item.read ? "font-medium" : "font-bold text-purple-deep"}`}>{item.title}</strong>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${item.read ? "bg-slate-200 text-slate-600" : "bg-pink-accent text-white"}`}>{item.read ? "Read" : "Unread"}</span>
+                </div>
                 <p className="break-all text-sm">
                   {item.reference} ·{" "}
                   {item.createdAt

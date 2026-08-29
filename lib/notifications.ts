@@ -2,6 +2,8 @@ import type { SubmissionKind } from "@/lib/types/submissions";
 
 export const notificationTypes = ["appointments", "contact", "corporate", "insurance", "telemedicine", "feedback"] as const;
 export type NotificationType = (typeof notificationTypes)[number];
+export const notificationReadEvent = "sgh:notifications-read";
+export type NotificationReadDetail = { all?: boolean; id?: string };
 
 export const notificationCopy: Record<NotificationType, { title: string; body: string }> = {
   appointments: { title: "New Appointment Request", body: "A new appointment request has been received." },

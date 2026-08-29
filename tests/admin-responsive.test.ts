@@ -13,6 +13,8 @@ describe("admin mobile responsiveness", () => {
     expect(notifications).toContain("sm:absolute sm:inset-x-auto sm:right-0");
     expect(notifications).toContain("fixed inset-x-3 bottom-3");
     expect(notifications).toContain('aria-label="Close notifications"');
+    expect(notifications).toContain("Mark all as read");
+    expect(notifications).toContain('item.read ? "Read" : "Unread"');
   });
 
   it("handles transient notification network failures without tight polling", () => {
