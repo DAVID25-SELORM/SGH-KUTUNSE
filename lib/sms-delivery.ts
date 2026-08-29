@@ -1,4 +1,14 @@
 export type DeliveryStatus = "queued" | "sent" | "delivered" | "failed" | "interrupted_delivery_unknown";
+export type ProviderDeliveryReport = { providerId: string; status: string };
+
+export function parseArkeselDeliveryReports(
+  data: Record<string, { status?: string; message_status?: string }>,
+): ProviderDeliveryReport[] {
+  return Object.entries(data).flatMap(([providerId, report]) => {
+    const status = report?.status ?? report?.message_status;
+    return status ? [{ providerId, status }] : [];
+  });
+}
 
 export type DeliveryTransition = {
   status: DeliveryStatus;

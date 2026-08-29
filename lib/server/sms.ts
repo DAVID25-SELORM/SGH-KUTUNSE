@@ -1,5 +1,6 @@
 import "server-only";
 import { MockSmsProvider, type SmsProvider } from "@/lib/sms";
+import { parseArkeselDeliveryReports } from "@/lib/sms-delivery";
 
 type ArkeselResponse = {
   status?: string;
@@ -147,13 +148,11 @@ export class ArkeselSmsProvider implements SmsProvider {
           throw new Error(`Arkesel report lookup failed (${response.status}).`);
         const payload = (await response.json()) as {
           status?: string;
-          data?: Record<string, { status?: string }>;
+          data?: Record<string, { status?: string; message_status?: string }>;
         };
         if (payload.status !== "success" || !payload.data)
           throw new Error("Arkesel returned an invalid report response.");
-        return Object.entries(payload.data).flatMap(([providerId, report]) =>
-          report?.status ? [{ providerId, status: report.status }] : [],
-        );
+        return parseArkeselDeliveryReports(payload.data);
       }),
     );
     return results.flat();
