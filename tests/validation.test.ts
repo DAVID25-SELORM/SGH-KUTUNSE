@@ -189,6 +189,13 @@ describe("security utilities", () => {
     expect(hasPermission("admin", "feedback_receipts")).toBe(false);
     expect(hasPermission("super_admin", "feedback_receipts")).toBe(true);
     expect(hasPermission("admin", "feedback_sms")).toBe(false);
+    expect(hasPermission("sms_manager", "feedback_sms")).toBe(true);
+    expect(hasPermission("sms_manager", "feedback_campaigns")).toBe(true);
+    expect(hasPermission("sms_manager", "contacts_manage")).toBe(true);
+    expect(hasPermission("sms_manager", "sms_settings_view")).toBe(true);
+    expect(hasPermission("sms_manager", "sms_settings_write")).toBe(false);
+    expect(hasPermission("sms_manager", "users")).toBe(false);
+    expect(hasPermission("sms_manager", "audit")).toBe(false);
     expect(hasPermission("super_admin", "feedback_sms")).toBe(true);
   });
   it("enforces safe submission transitions", () => {

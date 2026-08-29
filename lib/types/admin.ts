@@ -1,6 +1,7 @@
 export const ADMIN_ROLES = [
   "super_admin",
   "admin",
+  "sms_manager",
   "reception",
   "insurance",
   "corporate",
@@ -66,6 +67,15 @@ const grants: Record<AdminRole, readonly Permission[]> = {
     "contacts_manage",
     "sms_settings_view",
     "analytics_view",
+  ],
+  sms_manager: [
+    "feedback",
+    "feedback_manage",
+    "feedback_campaigns",
+    "feedback_sms",
+    "contacts",
+    "contacts_manage",
+    "sms_settings_view",
   ],
   reception: [
     "appointments",
