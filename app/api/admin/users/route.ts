@@ -38,10 +38,17 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   const actor = await verifyAdminRequest("users");
-  if (!actor || !hasRole(actor.roles, "super_admin"))
-    return NextResponse.json({ ok: false }, { status: 403 });
+  if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, createSchema);
   if (parsed.error) return parsed.error;
+  if (
+    !hasRole(actor.roles, "super_admin") &&
+    parsed.data.roles.includes("super_admin")
+  )
+    return NextResponse.json(
+      { ok: false, message: "Only a Super Admin can assign that role." },
+      { status: 403 },
+    );
   try {
     const user = await adminAuth.createUser({
       email: parsed.data.email,
@@ -101,8 +108,7 @@ export async function PATCH(request: Request) {
       { status: 403 },
     );
   const actor = await verifyAdminRequest("users");
-  if (!actor || !hasRole(actor.roles, "super_admin"))
-    return NextResponse.json({ ok: false }, { status: 403 });
+  if (!actor) return NextResponse.json({ ok: false }, { status: 403 });
   const parsed = await parseJson(request, updateSchema);
   if (parsed.error) return parsed.error;
   if (parsed.data.uid === actor.uid && parsed.data.disabled)
@@ -119,6 +125,14 @@ export async function PATCH(request: Request) {
     return NextResponse.json(
       { ok: false, message: "Administrator not found." },
       { status: 404 },
+    );
+  if (
+    !hasRole(actor.roles, "super_admin") &&
+    parsed.data.roles?.includes("super_admin")
+  )
+    return NextResponse.json(
+      { ok: false, message: "Only a Super Admin can assign that role." },
+      { status: 403 },
     );
   if (parsed.data.resetLink) {
     if (!user.email)

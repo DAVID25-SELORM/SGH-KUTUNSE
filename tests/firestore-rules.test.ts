@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 afterAll(async () => env?.cleanup());
 
-const roles = ["viewer", "reception", "insurance", "corporate", "content_editor", "sms_manager", "admin", "super_admin"];
+const roles = ["viewer", "reception", "insurance", "corporate", "content_editor", "sms_manager", "user_manager", "admin", "super_admin"];
 describe("default-deny operational rules", () => {
   it("denies anonymous operational reads and writes", async () => { const db=env!.unauthenticatedContext().firestore(); await assertFails(getDoc(doc(db,"appointment_requests","x"))); await assertFails(setDoc(doc(db,"contact_messages","x"),{message:"private"})); });
   for (const role of roles) it(`denies direct ${role} operational access`, async () => { const db=env!.authenticatedContext(role,{role}).firestore(); await assertFails(getDoc(doc(db,"insurance_verifications","x"))); await assertFails(setDoc(doc(db,"appointment_requests","x"),{status:"completed"})); });

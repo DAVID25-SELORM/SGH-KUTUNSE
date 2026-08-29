@@ -4,12 +4,14 @@ import { CreateAdminForm } from "@/components/admin/CreateAdminForm";
 import { AdminUserActions } from "@/components/admin/AdminUserActions";
 import {
   canViewAdminIdentity,
+  hasPermission,
   hasRole,
   normalizeAdminRoles,
 } from "@/lib/types/admin";
 
 export default async function Page() {
   const actor = await requireAdmin("users");
+  const canAssignSuperAdmin = hasRole(actor.roles, "super_admin");
   const result = await adminAuth.listUsers(100);
   const visibleUsers = result.users.filter((user) =>
     canViewAdminIdentity(
@@ -45,12 +47,15 @@ export default async function Page() {
                 uid={user.uid}
                 roles={safeRoles}
                 disabled={user.disabled}
+                canAssignSuperAdmin={canAssignSuperAdmin}
               />
             </div>
           );
         })}
       </div>
-      {hasRole(actor.roles, "super_admin") && <CreateAdminForm />}
+      {hasPermission(actor.roles, "users") && (
+        <CreateAdminForm canAssignSuperAdmin={canAssignSuperAdmin} />
+      )}
     </section>
   );
 }
