@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { campaignAudienceSchema, campaignLink, campaignSendSchema } from "@/lib/feedback-campaigns";
+import { campaignAudienceSchema, campaignConsentScope, campaignLink, campaignSendSchema } from "@/lib/feedback-campaigns";
 import { hasSmsConsentForPurpose, type SmsConsentScope } from "@/lib/contacts";
 import { normalizeGhanaPhone } from "@/lib/sms";
 import type { SmsResult } from "@/lib/sms";
@@ -131,19 +131,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const currentLease = campaign.processingLeaseUntil?.toDate?.();
   const recoveryWindowOpen = campaign.status === "sending" && currentLease instanceof Date && currentLease.getTime() <= Date.now();
   if (campaign.testVerified !== true || (!isScheduled && campaign.status !== "test_verified" && !recoveryWindowOpen))
-    return NextResponse.json({ ok: false, message: "Bulk SMS unlocks automatically after the test survey is submitted successfully." }, { status: 409 });
+    return NextResponse.json({ ok: false, message: String(campaign.purpose ?? "feedback_request") === "feedback_request" ? "Bulk SMS unlocks automatically after the test survey is submitted successfully." : "Bulk SMS unlocks after the Test SMS for this exact message is accepted by the provider. Send the test first." }, { status: 409 });
   const currentMessageHash = createHash("sha256").update(String(campaign.message)).digest("hex");
   if (!campaign.testedMessageHash || campaign.testedMessageHash !== currentMessageHash || (campaign.messageHash && campaign.messageHash !== currentMessageHash)) return NextResponse.json({ ok: false, message: "The current message has not been tested. Send and complete a new test first." }, { status: 409 });
   const message = resolveSmsMessage(String(campaign.message), String(campaign.purpose ?? "feedback_request") === "feedback_request" ? campaignLink(id, String(campaign.source)) : undefined);
+  const consentScope: SmsConsentScope = campaignConsentScope(campaign);
   let recalculated;
   try {
     let allowedContactIds: Set<string> | undefined;
     if (campaign.source !== "custom_list") {
       const audience = campaignAudienceSchema.parse(campaign.audience);
-      const currentAudience = await loadCampaignAudience(audience);
+      const currentAudience = await loadCampaignAudience({ ...audience, purpose: consentScope });
       allowedContactIds = new Set(currentAudience.eligibleContacts.map(contact => contact.id));
     }
-    recalculated = await recalculateEligible(ref, String(campaign.audience?.purpose ?? "feedback_request") as SmsConsentScope, allowedContactIds);
+    recalculated = await recalculateEligible(ref, consentScope, allowedContactIds);
   } catch (error) {
     if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This campaign exceeds the 5,000-recipient limit." }, { status: 413 });
     if (isScheduled) {

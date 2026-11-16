@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import {
+  campaignConsentScope,
   campaignCreateSchema,
   campaignLink,
   campaignMessageSchema,
@@ -12,6 +13,14 @@ import {
 import { MockSmsProvider } from "@/lib/sms";
 import { ArkeselSmsProvider } from "@/lib/server/sms";
 describe("feedback campaigns", () => {
+  it("derives the consent scope from the campaign purpose, not a stored audience", () => {
+    expect(campaignConsentScope({ purpose: "general_service_information", audience: { purpose: "feedback_request" } })).toBe("service_followup");
+    expect(campaignConsentScope({ purpose: "health_screening_followup" })).toBe("health_screening_followup");
+    expect(campaignConsentScope({})).toBe("feedback_request");
+  });
+  it("accepts a general broadcast without a survey link", () => {
+    expect(campaignCreateSchema.safeParse({ name: "Holiday hours", source: "all_contacts", purpose: "general_service_information", message: "Satellite General Hospital: our outpatient clinic opens at 8am on public holidays." }).success).toBe(true);
+  });
   it("normalizes and deduplicates", () => {
     const r = parseRecipientImport("0241234567, +233241234567\ninvalid");
     expect(r.recipients).toEqual(["+233241234567"]);

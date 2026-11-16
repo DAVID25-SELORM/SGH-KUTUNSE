@@ -29,13 +29,9 @@ export function ContactEditor({
     setBusy(true);
     setMessage("");
     const optedIn = fd.get("smsOptIn") === "on";
-    const existingScopes = Array.isArray(initial.smsConsentScope)
-      ? initial.smsConsentScope.filter((value) =>
-          SMS_CONSENT_SCOPES.includes(
-            value as (typeof SMS_CONSENT_SCOPES)[number],
-          ),
-        )
-      : [];
+    const selectedScopes = SMS_CONSENT_SCOPES.filter(
+      (scope) => fd.get(`scope_${scope}`) === "on",
+    );
     const body = {
       fullName: fd.get("fullName"),
       phone: fd.get("phone"),
@@ -54,7 +50,7 @@ export function ContactEditor({
         .filter(Boolean),
       smsOptIn: optedIn,
       smsConsentStatus: optedIn
-        ? String(initial.smsConsentStatus ?? "opted_in")
+        ? "opted_in"
         : id
           ? "opted_out"
           : "unknown",
@@ -62,8 +58,8 @@ export function ContactEditor({
         initial.smsConsentSource ?? (optedIn ? fd.get("source") : ""),
       ),
       smsConsentScope: optedIn
-        ? existingScopes.length
-          ? existingScopes
+        ? selectedScopes.length
+          ? selectedScopes
           : ["feedback_request"]
         : [],
       smsConsentDate: String(initial.smsConsentDate ?? ""),
@@ -250,6 +246,34 @@ export function ContactEditor({
           />{" "}
           SMS consent
         </label>
+        <fieldset className="rounded-xl border p-3 sm:col-span-2">
+          <legend className="px-1 text-sm font-semibold">
+            SMS consent applies to
+          </legend>
+          {SMS_CONSENT_SCOPES.map((scope) => {
+            const existing = Array.isArray(initial.smsConsentScope)
+              ? initial.smsConsentScope.map(String)
+              : [];
+            return (
+              <label key={scope} className="mr-5 inline-flex items-center gap-2 text-sm">
+                <input
+                  name={`scope_${scope}`}
+                  type="checkbox"
+                  defaultChecked={
+                    existing.length
+                      ? existing.includes(scope)
+                      : scope === "feedback_request"
+                  }
+                />
+                {scope === "feedback_request"
+                  ? "Feedback requests"
+                  : scope === "health_screening_followup"
+                    ? "Health screening follow-up"
+                    : "General broadcasts & service messages"}
+              </label>
+            );
+          })}
+        </fieldset>
         <label className="flex items-center gap-2">
           <input
             name="emailOptIn"

@@ -1,13 +1,19 @@
 import { createHash } from "node:crypto";
 import { z } from "@/lib/zod";
 import { AGE_GROUPS, SMS_CONSENT_SCOPES } from "@/lib/contacts";
-import { campaignPurposes, maxSmsCharacters, unknownMergeFields } from "@/lib/sms-message";
+import { campaignPurposes, maxSmsCharacters, purposeConsentScope, unknownMergeFields, type CampaignPurpose } from "@/lib/sms-message";
 import { campaignSources } from "@/lib/feedback-campaign-client";
 
 export { campaignSources, defaultFeedbackMessage, parseRecipientImport } from "@/lib/feedback-campaign-client";
 
 const controlledMessage = z.string().trim().min(20).max(maxSmsCharacters).refine((value) => unknownMergeFields(value).length === 0, "Message contains an unsupported merge field.").refine((value) => !/\b(diagnosis|medication|treatment|screening result|insurance details?|password|api key|firestore|member id|claim number)\b/i.test(value), "Message must not contain confidential clinical, insurance, credential, or internal identifier information.");
 export const campaignMessageSchema = z.strictObject({ message: controlledMessage, purpose: z.enum(campaignPurposes).default("feedback_request"), templateId: z.string().trim().max(80).default("patient_feedback"), messageMode: z.enum(["template", "custom"]).default("template") }).superRefine((value, context) => { if (value.purpose === "feedback_request" && !value.message.includes("[SURVEY LINK]")) context.addIssue({ code: "custom", path: ["message"], message: "Feedback Request messages must contain [SURVEY LINK]." }); });
+
+/** The consent scope a campaign must be checked against, derived from its purpose (never from a stale stored audience). */
+export function campaignConsentScope(campaign: Record<string, unknown>) {
+  const purpose = (campaignPurposes as readonly string[]).includes(String(campaign.purpose)) ? (campaign.purpose as CampaignPurpose) : "feedback_request";
+  return purposeConsentScope[purpose];
+}
 
 export function canEditCampaignMessage(campaign: Record<string, unknown>) {
   return ["draft", "ready", "test_sent", "test_link_opened", "test_verified"].includes(String(campaign.status));

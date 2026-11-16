@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { campaignMessageSchema, canEditCampaignMessage } from "@/lib/feedback-campaigns";
+import { campaignConsentScope, campaignMessageSchema, canEditCampaignMessage } from "@/lib/feedback-campaigns";
 import { verifyAdminRequest } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { isTrustedOrigin } from "@/lib/server/origin";
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const previous = snapshot.data()!; const messageHash = createHash("sha256").update(parsed.data.message).digest("hex");
       if (parsed.data.purpose !== String(previous.purpose ?? "feedback_request") && previous.status !== "draft") throw new Error("CAMPAIGN_PURPOSE_LOCKED");
       const changed = messageHash !== previous.messageHash || parsed.data.purpose !== String(previous.purpose ?? "feedback_request");
-      transaction.update(campaignRef, { message: parsed.data.message, purpose: parsed.data.purpose, templateId: parsed.data.templateId, messageMode: parsed.data.messageMode, messageHash, messageVersion: changed ? FieldValue.increment(1) : Number(previous.messageVersion ?? 1), ...(changed ? { status: "ready", testedMessageHash: null, testTokenHash: null, testSmsAcceptedAt: null, testLinkOpenedAt: null, testFeedbackSubmittedAt: null, testVerifiedAt: null, testVerified: false } : {}), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
+      transaction.update(campaignRef, { message: parsed.data.message, purpose: parsed.data.purpose, templateId: parsed.data.templateId, messageMode: parsed.data.messageMode, ...(previous.audience && typeof previous.audience === "object" ? { "audience.purpose": campaignConsentScope({ purpose: parsed.data.purpose }) } : {}), messageHash, messageVersion: changed ? FieldValue.increment(1) : Number(previous.messageVersion ?? 1), ...(changed ? { status: "ready", testedMessageHash: null, testTokenHash: null, testSmsAcceptedAt: null, testLinkOpenedAt: null, testFeedbackSubmittedAt: null, testVerifiedAt: null, testVerified: false } : {}), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
       const auditRef = adminDb.collection("audit_logs").doc();
       transaction.create(auditRef, { actorUid: actor.uid, action: changed && previous.testVerified === true ? "sms_campaign.test_invalidated" : parsed.data.templateId !== previous.templateId ? "sms_campaign.template_selected" : "sms_campaign.message_updated", entityType: "feedback_campaign", entityId: id, metadata: { status: String(snapshot.get("status") ?? ""), purpose: parsed.data.purpose, messageHash, templateId: parsed.data.templateId || "custom", messageMode: parsed.data.messageMode }, timestamp: FieldValue.serverTimestamp() });
     });

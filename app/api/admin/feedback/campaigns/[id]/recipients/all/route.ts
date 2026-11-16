@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
-import { recipientKey } from "@/lib/feedback-campaigns";
+import { campaignConsentScope, recipientKey } from "@/lib/feedback-campaigns";
 import { normalizeGhanaPhone } from "@/lib/sms";
 import { verifyAdminRequest } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
@@ -42,7 +42,7 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "Recipients cannot be changed after processing starts." }, { status: 409 });
 
   let resolved;
-  try { resolved = await loadCampaignAudience(audience); }
+  try { resolved = await loadCampaignAudience({ ...audience, purpose: campaignConsentScope(target.data()!) }); }
   catch (error) { if (error instanceof Error && error.message === "AUDIENCE_LIMIT") return NextResponse.json({ ok: false, message: "This audience exceeds the 5,000-recipient campaign limit. Apply narrower filters." }, { status: 413 }); throw error; }
   const { summary, eligibleContacts } = resolved;
   if (!summary.eligible) return NextResponse.json({ ok: false, message: "No contacts are currently eligible for SMS.", audience: summary }, { status: 409 });

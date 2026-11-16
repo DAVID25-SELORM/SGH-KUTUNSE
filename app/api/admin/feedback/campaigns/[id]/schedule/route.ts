@@ -1,6 +1,6 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
-import { campaignAudienceSchema, campaignScheduleSchema } from "@/lib/feedback-campaigns";
+import { campaignAudienceSchema, campaignConsentScope, campaignScheduleSchema } from "@/lib/feedback-campaigns";
 import { verifyAdminRequest } from "@/lib/server/auth";
 import { writeAudit } from "@/lib/server/audit";
 import { loadCampaignAudience } from "@/lib/server/campaign-audience";
@@ -41,7 +41,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!validation.ok) return NextResponse.json({ ok: false, message: validation.message }, { status: 400 });
   const audience = campaignAudienceSchema.safeParse(campaign.audience);
   if (!audience.success) return NextResponse.json({ ok: false, message: "This campaign does not have a valid saved audience." }, { status: 409 });
-  const { summary } = await loadCampaignAudience(audience.data);
+  const { summary } = await loadCampaignAudience({ ...audience.data, purpose: campaignConsentScope(campaign) });
   if (!summary.eligible) return NextResponse.json({ ok: false, message: "No eligible recipients remain. Review the audience exclusions before scheduling." }, { status: 409 });
   const generation = Number(campaign.scheduleGeneration ?? 0) + 1;
   const oldTask = String(campaign.scheduledTaskName ?? "");

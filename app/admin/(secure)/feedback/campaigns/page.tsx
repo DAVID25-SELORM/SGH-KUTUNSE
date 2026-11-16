@@ -36,7 +36,7 @@ export default async function Page() {
     <h1 className="text-3xl font-semibold text-purple-deep">SMS Campaigns</h1>
     <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
       <strong>Purpose-aware test verification</strong>
-      <p className="mt-2 text-sm">Feedback requests unlock only after secure feedback submission. Approved non-feedback messages unlock after the provider accepts the exact tested message.</p>
+      <p className="mt-2 text-sm">Use <strong>General Broadcast</strong> as the campaign purpose to send an announcement to any recipient group. Feedback requests unlock only after secure feedback submission. Approved non-feedback messages unlock after the provider accepts the exact tested message.</p>
     </div>
     <FeedbackCampaignManager initialCampaigns={campaigns} canSend={hasPermission(session.roles, "feedback_sms")} providerMode={provider.mode} schedulingEnabled={smsSchedulingEnabled()} initialSmsPolicy={smsPolicy} />
     {session.roles.includes("super_admin") ? <ConsentMigrationPanel /> : null}

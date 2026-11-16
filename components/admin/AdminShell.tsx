@@ -86,6 +86,12 @@ const groups: Array<{
         permission: "feedback",
       },
       {
+        href: "/admin/feedback/campaigns",
+        label: "SMS campaigns",
+        icon: MessageSquare,
+        permission: "feedback_campaigns",
+      },
+      {
         href: "/admin/contacts",
         label: "Contacts",
         icon: Users,

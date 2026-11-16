@@ -1163,6 +1163,13 @@ export function FeedbackCampaignManager({
                   ))}
                 </select>
               </label>
+              <p className="mt-2 text-sm text-text-muted">
+                Only contacts with SMS consent for{" "}
+                <strong>
+                  {purposeConsentScope[purpose].replaceAll("_", " ")}
+                </strong>{" "}
+                receive this campaign.
+              </p>
               <div className="mt-4 flex gap-4">
                 <label>
                   <input
