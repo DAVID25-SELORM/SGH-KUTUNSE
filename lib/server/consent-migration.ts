@@ -5,7 +5,7 @@ import { adminDb } from "./firebase-admin";
 
 export const SCREENING_CONSENT_SCOPES = ["feedback_request", "health_screening_followup"] as const;
 
-export async function previewScreeningConsentMigration() {
+async function loadContactsWithOptOuts() {
   const snapshot = await adminDb.collection("feedback_contacts").limit(5_001).get();
   if (snapshot.size > 5_000) throw new Error("CONTACT_LIMIT");
   const contacts = snapshot.docs.map(doc => ({ id: doc.id, ref: doc.ref, data: doc.data() }));
@@ -15,6 +15,11 @@ export async function previewScreeningConsentMigration() {
     const optOuts = await adminDb.getAll(...group.map(contact => adminDb.collection("sms_opt_outs").doc(contact.id)));
     optOuts.forEach((doc, index) => { if (doc.exists) optedOutIds.add(group[index].id); });
   }
+  return { contacts, optedOutIds };
+}
+
+export async function previewScreeningConsentMigration() {
+  const { contacts, optedOutIds } = await loadContactsWithOptOuts();
   const seen = new Set<string>();
   const candidates: typeof contacts = [];
   let invalidNumbers = 0, duplicates = 0, doNotContact = 0, existingOptOuts = 0, inactive = 0, alreadyScoped = 0;
@@ -34,4 +39,28 @@ export async function previewScreeningConsentMigration() {
     summary: { totalContacts: contacts.length, contactsToMarkConsented: candidates.length, existingOptOuts, doNotContact, duplicates, invalidNumbers, inactive, alreadyScoped, consentSource: "health_screening", consentScope: [...SCREENING_CONSENT_SCOPES] },
     candidates,
   };
+}
+
+export const SERVICE_CONSENT_SCOPE = "service_followup" as const;
+
+/** Contacts with verified opt-in who lack general broadcast / service consent. Legacy opt-ins are already eligible and are not touched. */
+export async function previewServiceConsentMigration() {
+  const { contacts, optedOutIds } = await loadContactsWithOptOuts();
+  const seen = new Set<string>();
+  const candidates: typeof contacts = [];
+  let invalidNumbers = 0, duplicates = 0, doNotContact = 0, existingOptOuts = 0, inactive = 0, alreadyScoped = 0, noExistingConsent = 0;
+  for (const contact of contacts) {
+    const data = contact.data;
+    if (data.status !== "active") { inactive++; continue; }
+    const phone = normalizeGhanaPhone(String(data.normalizedPhone ?? data.phone ?? ""));
+    if (!phone) { invalidNumbers++; continue; }
+    if (seen.has(phone)) { duplicates++; continue; }
+    seen.add(phone);
+    if (data.doNotContact === true) { doNotContact++; continue; }
+    if (optedOutIds.has(contact.id) || data.smsConsentStatus === "opted_out") { existingOptOuts++; continue; }
+    if (hasSmsConsentForPurpose(data, SERVICE_CONSENT_SCOPE)) { alreadyScoped++; continue; }
+    if (data.smsConsentStatus !== "opted_in") { noExistingConsent++; continue; }
+    candidates.push(contact);
+  }
+  return { summary: { totalContacts: contacts.length, contactsToMarkConsented: candidates.length, existingOptOuts, doNotContact, duplicates, invalidNumbers, inactive, alreadyScoped, noExistingConsent, consentScope: [SERVICE_CONSENT_SCOPE] }, candidates };
 }
