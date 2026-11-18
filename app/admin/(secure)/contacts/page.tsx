@@ -13,7 +13,6 @@ import { normalizeGhanaPhone } from "@/lib/sms";
 import { requireAdmin } from "@/lib/server/auth";
 import { adminDb } from "@/lib/server/firebase-admin";
 import {
-  ensureApprovedStaffContacts,
   ensureLegacyCampaignContacts,
 } from "@/lib/server/feedback-contacts";
 import { hasPermission } from "@/lib/types/admin";
@@ -38,7 +37,6 @@ export default async function ContactsPage({
   searchParams: Promise<Params>;
 }) {
   const session = await requireAdmin("contacts");
-  await ensureApprovedStaffContacts();
   await ensureLegacyCampaignContacts();
   const filters = await searchParams;
   const snapshot = await adminDb.collection("feedback_contacts").get();
