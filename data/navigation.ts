@@ -38,7 +38,7 @@ export const footerQuickLinks: NavItem[] = [
   { label: "Telemedicine", href: "/telemedicine" },
   { label: "Health Screening", href: "/screening" },
   { label: "Corporate Wellness", href: "/corporate-wellness" },
-  { label: "Health Articles", href: "/health" },
+  // "Health Articles" (/health) is re-added here once articles are published; the page is noindex and out of the sitemap until then.
   { label: "Programs Gallery", href: "/gallery" },
   { label: "Careers", href: "/careers" },
   { label: "Directions", href: "/directions" },

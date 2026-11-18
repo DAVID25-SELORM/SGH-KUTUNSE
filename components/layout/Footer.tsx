@@ -5,14 +5,11 @@ import { footerQuickLinks, footerLegalLinks } from "@/data/navigation";
 import { services } from "@/data/services";
 import { Container } from "@/components/ui/Container";
 import { Logo } from "@/components/layout/Logo";
-import { getPublishedArticles } from "@/lib/server/public-content";
 
 const footerServices = services.slice(0, 8);
 
-export async function Footer() {
+export function Footer() {
   const year = new Date().getFullYear();
-  const hasArticles = (await getPublishedArticles()).length > 0;
-  const quickLinks = footerQuickLinks.filter((link) => link.href !== "/health" || hasArticles);
 
   return (
     <footer className="border-t border-border-default bg-purple-dark text-white/90">
@@ -29,7 +26,7 @@ export async function Footer() {
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wide text-white">Quick Links</h3>
           <ul className="mt-4 flex flex-col gap-2.5">
-            {quickLinks.map((link) => (
+            {footerQuickLinks.map((link) => (
               <li key={link.href}>
                 <Link href={link.href} className="inline-flex min-h-11 items-center py-2 text-sm text-white/70 hover:text-white">
                   {link.label}
