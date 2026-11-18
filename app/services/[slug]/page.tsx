@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Phone } from "lucide-react";
+import { CheckCircle2, MessageCircle, Phone } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -147,6 +148,10 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
               <Button href={`tel:${HOSPITAL.phonesTel[0]}`} variant="outline" className="w-full">
                 <Phone className="h-4 w-4" aria-hidden="true" />
                 Call {HOSPITAL.phones[0]}
+              </Button>
+              <Button href={whatsappLink(`Hello SGH, I'd like to ask about ${service.name}.`)} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                WhatsApp about this service
               </Button>
             </div>
           </Card>

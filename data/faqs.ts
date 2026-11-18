@@ -12,7 +12,7 @@ export const faqs: FAQItem[] = [
     category: "Appointments",
     question: "Is my appointment confirmed once I submit the form?",
     answer:
-      "No appointment is confirmed online. Please call the hospital and speak with a representative to confirm availability and your appointment time.",
+      "Your request is not confirmed until a hospital representative contacts you by WhatsApp or phone. We aim to confirm within 30 minutes, 24/7. For anything urgent, call or come straight in.",
   },
   {
     category: "Insurance",

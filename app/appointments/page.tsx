@@ -5,11 +5,12 @@ import { PageHero } from "@/components/shared/PageHero";
 import { AppointmentForm } from "@/components/forms/AppointmentForm";
 import { buildMetadata } from "@/lib/metadata";
 import { HOSPITAL } from "@/lib/constants";
-import { Phone, Clock } from "lucide-react";
+import { Phone, Clock, MessageCircle } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
 
 export const metadata: Metadata = buildMetadata({
   title: "Book Appointment",
-  description: `Request an appointment at ${HOSPITAL.name}. A hospital representative will contact you to confirm availability.`,
+  description: `Request an appointment at ${HOSPITAL.name} in under a minute. We confirm within 30 minutes, 24/7.`,
   path: "/appointments",
 });
 
@@ -19,7 +20,7 @@ export default function AppointmentsPage() {
       <PageHero
         eyebrow="Appointments"
         title="Book an Appointment"
-        description="Complete the form below to request an appointment. This is a request, not a confirmation — a hospital representative will contact you to confirm availability."
+        description="Tell us who you are, what you need and when suits you. This is a request: we confirm by WhatsApp or phone within 30 minutes, 24/7."
         crumbs={[{ label: "Book Appointment" }]}
       />
 
@@ -44,6 +45,17 @@ export default function AppointmentsPage() {
               >
                 <Phone className="h-4 w-4" aria-hidden="true" />
                 {HOSPITAL.phones[0]}
+              </a>
+            </Card>
+            <Card>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-bg-soft text-purple-deep">
+                <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-4 text-base font-semibold text-text-dark">Prefer WhatsApp?</h3>
+              <p className="mt-2 text-sm leading-relaxed text-text-body">Message us your name, what you need and the day you prefer.</p>
+              <a href={whatsappLink("Hello SGH, I'd like to book an appointment.")} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center gap-2 text-sm font-semibold text-purple-deep hover:text-purple-dark">
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                {HOSPITAL.whatsappDisplay}
               </a>
             </Card>
             <Card className="bg-bg-soft">

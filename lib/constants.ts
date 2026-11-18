@@ -6,6 +6,9 @@ export const HOSPITAL = {
   city: "Accra, Ghana",
   phones: ["0303 984 314", "059 257 5075"] as const,
   phonesTel: ["+233303984314", "+233592575075"] as const,
+  /** WhatsApp Business number in international format without "+", as wa.me requires. */
+  whatsapp: "233592575075",
+  whatsappDisplay: "059 257 5075",
   hours: "Open 24/7",
   email: "www.satellitegeneralhospital@gmail.com" as string | null,
   siteUrl: "https://satellitegeneralhospital.com",

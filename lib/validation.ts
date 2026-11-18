@@ -28,23 +28,41 @@ const pastOrTodayDate = date.refine(
 );
 const honeypot = z.string().max(0).optional();
 
-export const appointmentSchema = z.strictObject({
-  fullName: clean(2, 100),
-  phone,
-  email: email.optional().or(z.literal("")),
-  sex: z.enum(["Female", "Male"]),
-  dateOfBirth: date,
-  service: clean(1, 100),
-  preferredDoctor: optional(100),
-  preferredDate: date,
-  preferredTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  insuranceProvider: optional(100),
-  paymentMethod: z.enum(["Self Pay", "Insurance"]),
-  reasonForVisit: clean(5, 1000),
-  patientType: z.enum(["New Patient", "Existing Patient"]),
-  consent: z.literal(true),
-  website: honeypot,
-});
+export const APPOINTMENT_NEEDS = [
+  "General consultation",
+  "Child / paediatrics",
+  "Pregnancy / antenatal",
+  "Scan or lab test",
+  "Health check / medical",
+  "Specialist (ENT, eye, dental, physio)",
+  "Online consultation",
+  "Something else",
+] as const;
+export const APPOINTMENT_DAYS = ["Today", "Tomorrow", "Pick a day"] as const;
+
+const todayOrLater = date.refine(
+  (value) => value >= new Date().toISOString().slice(0, 10),
+  "Choose today or a later date.",
+);
+
+// Four things the patient must give us. Everything else is optional or collected at confirmation or registration.
+export const appointmentSchema = z
+  .strictObject({
+    fullName: clean(2, 100),
+    phone,
+    service: z.enum(APPOINTMENT_NEEDS),
+    preferredDay: z.enum(APPOINTMENT_DAYS),
+    preferredDate: z.union([todayOrLater, z.literal("")]).optional(),
+    preferredDoctor: optional(100),
+    insuranceProvider: optional(100),
+    notes: optional(1000),
+    consent: z.literal(true),
+    website: honeypot,
+  })
+  .superRefine((value, context) => {
+    if (value.preferredDay === "Pick a day" && !value.preferredDate)
+      context.addIssue({ code: "custom", path: ["preferredDate"], message: "Choose a date." });
+  });
 export type AppointmentInput = z.infer<typeof appointmentSchema>;
 
 export const contactSchema = z.strictObject({

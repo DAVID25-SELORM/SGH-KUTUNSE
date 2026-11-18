@@ -8,7 +8,9 @@ import { InsuranceVerificationForm } from "@/components/forms/InsuranceVerificat
 import { insurers } from "@/data/insurers";
 import { buildMetadata } from "@/lib/metadata";
 import { HOSPITAL } from "@/lib/constants";
-import { ShieldCheck } from "lucide-react";
+import { MessageCircle, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { whatsappLink } from "@/lib/whatsapp";
 
 export const metadata: Metadata = buildMetadata({
   title: "Insurance",
@@ -50,6 +52,10 @@ export default function InsurancePage() {
               <ShieldCheck className="h-6 w-6" aria-hidden="true" />
             </span>
             <SectionHeading className="mt-5" title="Verify Your Insurance" description="Send us your details and we'll help confirm your coverage before your appointment." />
+            <Button href={whatsappLink("Hello SGH, I'd like to check if my insurance is accepted.")} target="_blank" rel="noopener noreferrer" className="mt-5 bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              Check my cover on WhatsApp
+            </Button>
           </div>
           <Card className="lg:col-span-2">
             <InsuranceVerificationForm />

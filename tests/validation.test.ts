@@ -222,3 +222,28 @@ describe("analytics conversions and FAQ copy", () => {
     expect(JSON.stringify(faqs)).not.toMatch(/being upgraded/i);
   });
 });
+
+import { whatsappLink } from "@/lib/whatsapp";
+describe("four-field booking and WhatsApp", () => {
+  const base = { fullName: "Ama Mensah", phone: "0592575075", service: "Child / paediatrics", preferredDay: "Today", consent: true } as const;
+  it("accepts the four required fields plus consent", () => {
+    expect(appointmentSchema.safeParse(base).success).toBe(true);
+    expect(appointmentSchema.safeParse({ ...base, preferredDay: "Tomorrow", notes: "", insuranceProvider: "" }).success).toBe(true);
+  });
+  it("requires a date only when the patient picks a day, and not in the past", () => {
+    expect(appointmentSchema.safeParse({ ...base, preferredDay: "Pick a day" }).success).toBe(false);
+    expect(appointmentSchema.safeParse({ ...base, preferredDay: "Pick a day", preferredDate: "2020-01-01" }).success).toBe(false);
+    expect(appointmentSchema.safeParse({ ...base, preferredDay: "Pick a day", preferredDate: "2099-01-01" }).success).toBe(true);
+  });
+  it("requires consent, a listed service and rejects the old long-form fields", () => {
+    expect(appointmentSchema.safeParse({ ...base, consent: false }).success).toBe(false);
+    expect(appointmentSchema.safeParse({ ...base, service: "Theatre" }).success).toBe(false);
+    expect(appointmentSchema.safeParse({ ...base, sex: "Female" }).success).toBe(false);
+  });
+  it("builds a click-to-chat link with the pre-filled message", () => {
+    const link = whatsappLink("Hello SGH, I'd like to ask about Dental.");
+    expect(link.startsWith("https://wa.me/233592575075?text=")).toBe(true);
+    expect(decodeURIComponent(link.split("text=")[1])).toBe("Hello SGH, I'd like to ask about Dental.");
+    expect(conversionEventForHref(link)?.name).toBe("click_whatsapp");
+  });
+});

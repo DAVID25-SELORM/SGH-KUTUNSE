@@ -1,8 +1,9 @@
 import Image from "next/image";
-import { Clock, Phone } from "lucide-react";
+import { Clock, MessageCircle, Phone } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { HOSPITAL } from "@/lib/constants";
+import { whatsappLink } from "@/lib/whatsapp";
 
 export function Hero() {
   return (
@@ -47,6 +48,10 @@ export function Hero() {
             >
               <Phone className="h-4 w-4" aria-hidden="true" />
               Call Hospital
+            </Button>
+            <Button href={whatsappLink()} target="_blank" rel="noopener noreferrer" size="lg" className="bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              WhatsApp Us
             </Button>
           </div>
         </div>

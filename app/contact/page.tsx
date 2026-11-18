@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Phone, MapPin, Clock, Mail } from "lucide-react";
+import { Phone, MapPin, Clock, Mail, MessageCircle } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
 import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,18 @@ export default function ContactPage() {
                   </Button>
                 ))}
               </div>
+            </Card>
+
+            <Card>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-bg-soft text-purple-deep">
+                <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-4 text-base font-semibold text-text-dark">WhatsApp</h3>
+              <p className="mt-1 text-sm text-text-body">Message us for non-urgent questions. For an emergency, call or come straight in.</p>
+              <Button href={whatsappLink()} target="_blank" rel="noopener noreferrer" size="sm" className="mt-3 w-fit bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+                <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                {HOSPITAL.whatsappDisplay}
+              </Button>
             </Card>
 
             <Card>

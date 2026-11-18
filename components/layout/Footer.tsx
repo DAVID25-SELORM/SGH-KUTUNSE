@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Phone, MapPin, Clock } from "lucide-react";
+import { Phone, MapPin, Clock, MessageCircle } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
 import { HOSPITAL } from "@/lib/constants";
 import { footerQuickLinks, footerLegalLinks } from "@/data/navigation";
 import { services } from "@/data/services";
@@ -69,6 +70,12 @@ export function Footer() {
                 </a>
               </li>
             ))}
+            <li className="flex items-center gap-2.5">
+              <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center py-2 hover:text-white">
+                WhatsApp {HOSPITAL.whatsappDisplay}
+              </a>
+            </li>
             <li className="flex items-start gap-2.5">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               {HOSPITAL.address}

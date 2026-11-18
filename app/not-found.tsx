@@ -1,4 +1,5 @@
-import { SearchX } from "lucide-react";
+import { MessageCircle, SearchX } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 
@@ -17,6 +18,10 @@ export default function NotFound() {
           <Button href="/">Back to Home</Button>
           <Button href="/contact" variant="outline">
             Contact Us
+          </Button>
+          <Button href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            WhatsApp Us
           </Button>
         </div>
       </Container>

@@ -1,6 +1,7 @@
-import { Phone, MapPin, Clock } from "lucide-react";
+import { Phone, MapPin, Clock, MessageCircle } from "lucide-react";
 import { HOSPITAL } from "@/lib/constants";
 import { Container } from "@/components/ui/Container";
+import { whatsappLink } from "@/lib/whatsapp";
 
 export function UtilityBar() {
   return (
@@ -14,6 +15,10 @@ export function UtilityBar() {
           <a href={`tel:${HOSPITAL.phonesTel[0]}`} className="flex items-center gap-1.5 hover:text-white/80">
             <Phone className="h-3.5 w-3.5" aria-hidden="true" />
             {HOSPITAL.phones[0]}
+          </a>
+          <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-white/80">
+            <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            WhatsApp
           </a>
           <a
             href="/directions"

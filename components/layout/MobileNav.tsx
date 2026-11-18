@@ -3,7 +3,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { ChevronDown, Phone, X } from "lucide-react";
+import { whatsappLink } from "@/lib/whatsapp";
+import { ChevronDown, MessageCircle, Phone, X } from "lucide-react";
 import { mainNav } from "@/data/navigation";
 import { HOSPITAL } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
@@ -119,6 +120,10 @@ export function MobileNav({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
           <Button href={`tel:${HOSPITAL.phonesTel[0]}`} variant="outline" className="w-full">
             <Phone className="h-4 w-4" aria-hidden="true" />
             Call Hospital
+          </Button>
+          <Button href={whatsappLink()} target="_blank" rel="noopener noreferrer" onClick={onClose} className="w-full sm:col-span-2 bg-[#25D366] text-white hover:bg-[#1ebe5b] border-transparent">
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            WhatsApp Us
           </Button>
         </div>
       </div>
