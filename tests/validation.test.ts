@@ -208,3 +208,17 @@ describe("security utilities", () => {
     expect(canTransition("completed", "archived")).toBe(true);
   });
 });
+
+import { conversionEventForHref } from "@/lib/analytics-events";
+import { faqs } from "@/data/faqs";
+describe("analytics conversions and FAQ copy", () => {
+  it("maps call and directions links to conversion events", () => {
+    expect(conversionEventForHref("tel:+233303984314")?.name).toBe("click_call");
+    expect(conversionEventForHref("/directions")?.name).toBe("click_directions");
+    expect(conversionEventForHref("https://www.google.com/maps/search/?api=1&query=x")?.name).toBe("click_directions");
+    expect(conversionEventForHref("/about")).toBeNull();
+  });
+  it("does not tell patients booking is being upgraded", () => {
+    expect(JSON.stringify(faqs)).not.toMatch(/being upgraded/i);
+  });
+});

@@ -11,7 +11,7 @@ import { HOSPITAL } from "@/lib/constants";
 export const metadata: Metadata = buildMetadata({
   title: "Health Screening",
   description: `Preventive health screening packages available at ${HOSPITAL.name}, covering BMI, blood pressure, blood glucose and more.`,
-  path: "/screening",
+  path: "/services/health-screening",
 });
 
 const packages = [

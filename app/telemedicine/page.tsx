@@ -13,7 +13,7 @@ import { TelemedicineRequestForm } from "@/components/forms/TelemedicineRequestF
 export const metadata: Metadata = buildMetadata({
   title: "Telemedicine",
   description: `Request an online consultation with a healthcare professional at ${HOSPITAL.name}.`,
-  path: "/telemedicine",
+  path: "/services/telemedicine",
 });
 
 const steps = [

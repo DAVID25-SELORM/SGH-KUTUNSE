@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { appCheckHeaders } from "@/lib/app-check";
+import { trackEvent } from "@/lib/analytics-events";
 
 export function TelemedicineRequestForm() {
   const [reference, setReference] = useState("");
@@ -20,6 +21,7 @@ export function TelemedicineRequestForm() {
       const result = await response.json();
       if (!response.ok) throw new Error();
       setReference(result.reference); reset();
+      void trackEvent("generate_lead", { form_name: "telemedicine" });
     } catch { setFailed(true); }
   }
   if (reference) return <Alert variant="success" title="Request received.">Your reference is <strong>{reference}</strong>. This is not a confirmed consultation; the hospital will contact you.</Alert>;

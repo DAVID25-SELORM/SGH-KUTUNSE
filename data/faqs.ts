@@ -1,11 +1,12 @@
 import type { FAQItem } from "@/types";
+import { HOSPITAL } from "@/lib/constants";
 
 export const faqs: FAQItem[] = [
   {
     category: "Appointments",
     question: "How do I book an appointment?",
     answer:
-      "Online appointment requests are currently being upgraded. Please call 0303984314 or 059 257 5075 to request an appointment.",
+      `Submit a request on our Appointments page, or call ${HOSPITAL.phones[0]} or ${HOSPITAL.phones[1]}. A hospital representative will contact you to confirm your appointment time.`,
   },
   {
     category: "Appointments",

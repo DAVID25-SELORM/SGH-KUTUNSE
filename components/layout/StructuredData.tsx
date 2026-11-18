@@ -1,4 +1,4 @@
-import { HOSPITAL } from "@/lib/constants";
+import { HOSPITAL, SOCIAL_LINKS } from "@/lib/constants";
 
 export function StructuredData() {
   const data = {
@@ -7,7 +7,9 @@ export function StructuredData() {
     name: HOSPITAL.name,
     description: HOSPITAL.tagline,
     url: HOSPITAL.siteUrl,
-    telephone: HOSPITAL.phones.map((p) => p),
+    ...(HOSPITAL.email ? { email: HOSPITAL.email } : {}),
+    ...(SOCIAL_LINKS.length ? { sameAs: SOCIAL_LINKS.map((link) => link.href) } : {}),
+    telephone: [...HOSPITAL.phonesTel],
     address: {
       "@type": "PostalAddress",
       streetAddress: HOSPITAL.address,

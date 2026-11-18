@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { HOSPITAL } from "@/lib/constants";
 import { z } from "@/lib/zod";
 import { AGE_GROUPS, SMS_CONSENT_SCOPES } from "@/lib/contacts";
 import { campaignPurposes, maxSmsCharacters, purposeConsentScope, unknownMergeFields, type CampaignPurpose } from "@/lib/sms-message";
@@ -49,7 +50,7 @@ export function recipientKey(phone: string) {
 }
 
 export function campaignLink(code: string, source: string, testToken?: string) {
-  const url = new URL("https://www.satellitegeneralhospital.com/feedback");
+  const url = new URL("/feedback", HOSPITAL.siteUrl);
   if (testToken) url.searchParams.set("t", testToken);
   url.searchParams.set("campaign", code);
   url.searchParams.set("source", source === "health_screening" ? "health_screening" : "sms");

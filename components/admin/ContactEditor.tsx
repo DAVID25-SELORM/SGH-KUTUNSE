@@ -216,7 +216,7 @@ export function ContactEditor({
           <input
             name="facility"
             defaultValue={String(initial.facility ?? "")}
-            placeholder="Kutunse Screening - Aug 2026"
+            placeholder="Kuntunse Screening - Aug 2026"
             className={field}
           />
         </label>

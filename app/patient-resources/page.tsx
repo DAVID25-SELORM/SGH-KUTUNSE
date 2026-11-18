@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
 import { PageHero } from "@/components/shared/PageHero";
 import { FAQ } from "@/components/shared/FAQ";
+import { FaqStructuredData } from "@/components/layout/FaqStructuredData";
 import { CTASection } from "@/components/shared/CTASection";
 import { faqs } from "@/data/faqs";
 import { buildMetadata } from "@/lib/metadata";
@@ -61,6 +62,7 @@ export default function PatientResourcesPage() {
           </div>
           <div className="mt-8">
             <FAQ items={faqs} />
+            <FaqStructuredData items={faqs} />
           </div>
         </Container>
       </section>

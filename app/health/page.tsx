@@ -7,7 +7,10 @@ import { buildMetadata } from "@/lib/metadata";
 import { HOSPITAL } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = buildMetadata({ title: "Health Articles", description: `Health tips and hospital news from ${HOSPITAL.name}.`, path: "/health" });
+export async function generateMetadata(): Promise<Metadata> {
+  const base = buildMetadata({ title: "Health Articles", description: `Health tips and hospital news from ${HOSPITAL.name}.`, path: "/health" });
+  return (await getPublishedArticles()).length ? base : { ...base, robots: { index: false, follow: true } };
+}
 
 export default async function HealthArticlesPage() {
   const articles = await getPublishedArticles();

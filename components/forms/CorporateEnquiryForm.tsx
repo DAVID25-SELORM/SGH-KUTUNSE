@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { appCheckHeaders } from "@/lib/app-check";
+import { trackEvent } from "@/lib/analytics-events";
 
 export function CorporateEnquiryForm() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
@@ -29,6 +30,7 @@ export function CorporateEnquiryForm() {
       });
       const result = await res.json(); if (!res.ok) throw new Error("Request failed"); setReference(result.reference);
       setStatus("success");
+      void trackEvent("generate_lead", { form_name: "corporate_enquiry" });
       reset();
     } catch {
       setStatus("error");

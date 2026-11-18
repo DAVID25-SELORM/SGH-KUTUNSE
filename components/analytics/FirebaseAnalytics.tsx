@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { firebaseApp } from "@/lib/firebase";
+import { conversionEventForHref, trackEvent } from "@/lib/analytics-events";
 
 export function FirebaseAnalytics() {
   const pathname = usePathname();
@@ -24,6 +25,17 @@ export function FirebaseAnalytics() {
       active = false;
     };
   }, [pathname]);
+
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      if (!link) return;
+      const conversion = conversionEventForHref(link.getAttribute("href") ?? "");
+      if (conversion) void trackEvent(conversion.name, { ...conversion.params, page_path: window.location.pathname });
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
 
   return null;
 }

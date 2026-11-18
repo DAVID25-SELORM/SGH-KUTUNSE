@@ -18,11 +18,15 @@ npm run lint
 npm run build
 ```
 
+## Deployment
+
+Production deploys from the `firebase-migration` branch to Firebase App Hosting (project `satelitegeneralhospital`). `STORMERHOST_PHASE1_DEPLOYMENT.md`, `app.js` and `.cpanel.yml` describe an earlier cPanel hosting setup and are kept only for reference.
+
 ## Content and integrations
 
 - Repeated hospital content is maintained in `data/` and `lib/constants.ts`.
-- Doctor profiles and health articles are clearly marked demo content until verified records are supplied.
-- Appointment, contact, insurance, and corporate form layouts are preserved but submission is temporarily disabled. Visitors are directed to call the hospital until durable storage is implemented.
+- Doctor profiles, health articles and gallery albums are managed in the admin area (`/admin`) and published from Firestore only after verification.
+- Appointment, contact, insurance, corporate and telemedicine forms save submissions to Firestore and notify staff in the admin inbox. SMS campaigns, contacts and analytics are managed from the admin area.
 - The logo, directions map, care-team hero crop, and services flyer in `public/images/` were derived from official PDFs supplied by the hospital.
 - Facility photography remains intentionally represented by labelled placeholders until verified hospital photos are available.
 

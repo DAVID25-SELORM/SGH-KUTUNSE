@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { appCheckHeaders } from "@/lib/app-check";
+import { trackEvent } from "@/lib/analytics-events";
 
 export function AppointmentForm() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
@@ -35,6 +36,7 @@ export function AppointmentForm() {
       if (!res.ok) throw new Error("Request failed");
       setReference(result.reference);
       setStatus("success");
+      void trackEvent("generate_lead", { form_name: "appointment" });
       reset();
     } catch {
       setStatus("error");

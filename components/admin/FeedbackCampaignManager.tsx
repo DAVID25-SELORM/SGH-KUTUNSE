@@ -1077,7 +1077,7 @@ export function FeedbackCampaignManager({
                   <input
                     value={facility}
                     onChange={(e) => setFacility(e.target.value)}
-                    placeholder="Kutunse Screening - Aug 2026"
+                    placeholder="Kuntunse Screening - Aug 2026"
                     className="mt-2 w-full rounded-xl border bg-white p-3"
                   />
                 </label>
