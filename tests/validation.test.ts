@@ -236,6 +236,9 @@ describe("four-field booking and WhatsApp", () => {
     expect(appointmentSchema.safeParse({ ...base, preferredDay: "Pick a day", preferredDate: "2099-01-01" }).success).toBe(true);
   });
   it("requires consent, a listed service and rejects the old long-form fields", () => {
+    expect(appointmentSchema.safeParse({ ...base, heardFrom: "Google search" }).success).toBe(true);
+    expect(appointmentSchema.safeParse({ ...base, heardFrom: "" }).success).toBe(true);
+    expect(appointmentSchema.safeParse({ ...base, heardFrom: "Aliens" }).success).toBe(false);
     expect(appointmentSchema.safeParse({ ...base, consent: false }).success).toBe(false);
     expect(appointmentSchema.safeParse({ ...base, service: "Theatre" }).success).toBe(false);
     expect(appointmentSchema.safeParse({ ...base, sex: "Female" }).success).toBe(false);

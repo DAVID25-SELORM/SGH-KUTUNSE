@@ -46,6 +46,8 @@ const todayOrLater = date.refine(
 );
 
 // Four things the patient must give us. Everything else is optional or collected at confirmation or registration.
+export const HEARD_FROM_OPTIONS = ["Google search", "WhatsApp", "Facebook / Instagram", "Friend or family", "Community outreach", "Radio / TV", "Passed by the hospital", "Other"] as const;
+
 export const appointmentSchema = z
   .strictObject({
     fullName: clean(2, 100),
@@ -55,6 +57,7 @@ export const appointmentSchema = z
     preferredDate: z.union([todayOrLater, z.literal("")]).optional(),
     preferredDoctor: optional(100),
     insuranceProvider: optional(100),
+    heardFrom: z.union([z.enum(HEARD_FROM_OPTIONS), z.literal("")]).optional(),
     notes: optional(1000),
     consent: z.literal(true),
     website: honeypot,

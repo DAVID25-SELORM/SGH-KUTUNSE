@@ -36,6 +36,16 @@ const nextConfig: NextConfig = {
         destination: "https://satellitegeneralhospital.com/:path*",
         permanent: true,
       },
+      // App Hosting can pass the original host in x-forwarded-host, so the rule above alone does not always match.
+      {
+        source: "/:path*",
+        has: [{ type: "header", key: "x-forwarded-host", value: "www.satellitegeneralhospital.com" }],
+        destination: "https://satellitegeneralhospital.com/:path*",
+        permanent: true,
+      },
+      // One URL per topic: the standalone pages hold the full content (and the telemedicine request form).
+      { source: "/services/telemedicine", destination: "/telemedicine", permanent: true },
+      { source: "/services/health-screening", destination: "/screening", permanent: true },
     ];
   },
 };

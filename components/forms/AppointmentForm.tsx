@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MessageCircle, Phone } from "lucide-react";
-import { APPOINTMENT_DAYS, APPOINTMENT_NEEDS, appointmentSchema, type AppointmentInput } from "@/lib/validation";
+import { APPOINTMENT_DAYS, APPOINTMENT_NEEDS, HEARD_FROM_OPTIONS, appointmentSchema, type AppointmentInput } from "@/lib/validation";
 import { insurers } from "@/data/insurers";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -155,6 +155,14 @@ export function AppointmentForm() {
             {insurers.map((i) => (
               <option key={i.name} value={i.name}>
                 {i.name}
+              </option>
+            ))}
+          </Select>
+          <Select label="How did you hear about us?" id="heardFrom" defaultValue="" {...register("heardFrom")}>
+            <option value="">Prefer not to say</option>
+            {HEARD_FROM_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </Select>
